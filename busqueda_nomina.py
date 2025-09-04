@@ -27,20 +27,43 @@ if not os.path.exists(USUARIOS_FILE):
 # Funciones de usuario
 # =========================
 def cargar_usuarios():
-    return pd.read_csv(USUARIOS_FILE)
-
-def guardar_usuarios(df):
-    df.to_csv(USUARIOS_FILE, index=False)
+    if not os.path.exists(USUARIOS_FILE):
+        # Crear el archivo con usuario maestro si no existe
+        df = pd.DataFrame([{
+            "usuario": "acaracas",
+            "contraseña": hashlib.sha256("prueba1234".encode()).hexdigest(),
+            "nombre_completo": "Usuario Maestro",
+            "mensaje_bienvenida": "Bienvenido",
+            "es_maestro": True
+        }])
+        df.to_csv(USUARIOS_FILE, index=False)
+    # Forzar tipos y nombres de columnas correctos al leer
+    df = pd.read_csv(USUARIOS_FILE, dtype={
+        "usuario": str,
+        "contraseña": str,
+        "nombre_completo": str,
+        "mensaje_bienvenida": str,
+        "es_maestro": bool
+    })
+    # Asegurar que todas las columnas existan
+    for col in ["usuario", "contraseña", "nombre_completo", "mensaje_bienvenida", "es_maestro"]:
+        if col not in df.columns:
+            if col == "es_maestro":
+                df[col] = False
+            else:
+                df[col] = ""
+    return df
 
 def verificar_usuario(usuario, contraseña):
     df = cargar_usuarios()
+    df["contraseña"] = df["contraseña"].astype(str)
+    df["usuario"] = df["usuario"].astype(str)
     if usuario in df["usuario"].values:
         hash_pass = hashlib.sha256(contraseña.encode()).hexdigest()
         fila = df[df["usuario"] == usuario].iloc[0]
-        if fila["contraseña"] == hash_pass:
+        if "contraseña" in fila and fila["contraseña"] == hash_pass:
             return fila.to_dict()
     return None
-
 # =========================
 # Funciones de base de datos
 # =========================
@@ -234,3 +257,4 @@ if usuario_info:
             st.download_button("Descargar CSV de consultas", CONSULTAS_FILE)
         else:
             st.info("No hay consultas registradas")
+
