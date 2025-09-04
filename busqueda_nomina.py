@@ -3,19 +3,16 @@ import streamlit as st
 import requests
 from io import BytesIO
 
-# =========================
-# Configuración de hojas
-# =========================
+# Lista de hojas destino (incluyendo nuevas)
 hojas_destino = [
-    "NUEVO COSTEO", "COSTEO O.C.", "CORRES 2025", "BASE FEDERAL 2025", "BASE",
-    "VALIDACION IMPROS", "REGISTRO REVERSOS", "CAMBIO DE ADSCRIPCION", "STATUS DE COMISION",
-    "COMISIONES", "OFICIOS 2025-ENERO", "OFICIOS 2025-FEBRERO", "OFICIOS 2025-MARZO",
-    "OFICIO 2025-JUNIO", "LIC. MARCELA.", "CONTRATOS", "MEMOS", "MTRA. NOELIA",
+    "NUEVO COSTEO", "COSTEO O.C.", "CORRES 2025", "BASE FEDERAL 2025", "BASE", "VALIDACION IMPROS", "REGISTRO REVERSOS",
+    "CAMBIO DE ADSCRIPCION", "STATUS DE COMISION", "COMISIONES", "OFICIOS 2025-ENERO", "OFICIOS 2025-FEBRERO",
+    "OFICIOS 2025-MARZO", "OFICIO 2025-JUNIO", "LIC. MARCELA.", "CONTRATOS", "MEMOS", "MTRA. NOELIA",
     "STATUS DE OFI. DEPÁCHADOS OLI", "COMISIONES (2)", "Hoja1 (5)", "NOMINA ACTUAL",
     "DIVERSOS", "FORMATOS DE DESC. DIV", "CHEQUES-REVERSOS", "PENSIONES Y FORMATOS"
 ]
 
-# Columnas condicionantes (RFC, Nombre, Oficio, etc.)
+# Matriz de columnas condicionantes (RFC y Nombre)
 columnas_condicionantes = [
     ["C", "C", "", "D", "", "E", "E"] + [""] * 14 + ["C"] + ["B", "B", "B", "B"],  # RFC
     ["E", "D", "J", "E", "", "F", "F", "D", "C", "D", "C", "C", "C", "C", "E", "E", "E", "E", "E", "E", "D", "D"] + ["C", "C", "C", "C"],  # NOMBRE
@@ -25,33 +22,29 @@ columnas_condicionantes = [
     [""] * 7 + ["G", "A", "G", "A", "A", "A", "F", "C", "C", "C", "C", "C", "C", "B"] + [""] + ["", "", "", ""]  # OFICIO ELABORADO
 ]
 
-# =========================
-# Funciones auxiliares
-# =========================
+# Función para convertir letra de columna a índice (A=0, B=1, etc.)
 def excel_col_to_index(col):
-    """Convierte letra de columna Excel en índice 0-based"""
     col = col.upper()
     index = 0
     for char in col:
         index = index * 26 + (ord(char) - ord('A') + 1)
-    return index - 1
+    return index - 1  # 0-based
 
-def gsheet_to_excel_url(google_url: str) -> str:
-    """Convierte un enlace de Google Sheets en descarga directa XLSX"""
-    if "/d/" in google_url:
-        file_id = google_url.split("/d/")[1].split("/")[0]
-        return f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
-    else:
-        raise ValueError("El enlace de Google Sheets no es válido.")
-
+# Descargar y cargar Excel desde Google Drive
 @st.cache_data(show_spinner="Descargando y procesando Excel desde Google Drive...")
-def cargar_datos_excel(google_url: str, hojas: list):
-    """Descarga y carga un archivo Excel desde Google Drive"""
-    url_excel = gsheet_to_excel_url(google_url)
-    r = requests.get(url_excel)
-    r.raise_for_status()
-    file = BytesIO(r.content)
-    xls = pd.ExcelFile(file, engine="openpyxl")
+def cargar_datos_drive(file_id, hojas):
+    url = f"https://drive.google.com/uc?export=download&id={file_id}"
+    resp = requests.get(url)
+    
+    if resp.status_code != 200:
+        st.error("No se pudo descargar el archivo desde Google Drive. Verifica permisos o el ID.")
+        return {}
+    
+    if not resp.content[:2] == b'PK':
+        st.error("El archivo descargado no es un Excel válido. Verifica el ID o permisos.")
+        return {}
+    
+    xls = pd.ExcelFile(BytesIO(resp.content), engine="openpyxl")
     data = {}
     for hoja in hojas:
         if hoja in xls.sheet_names:
@@ -59,8 +52,8 @@ def cargar_datos_excel(google_url: str, hojas: list):
             data[hoja] = df
     return data
 
+# Función de búsqueda vectorizada
 def buscar_coincidencias(data, valores_buscar):
-    """Aplica filtros de búsqueda en cada hoja"""
     resultados = {}
     for j, hoja in enumerate(hojas_destino):
         if hoja not in data:
@@ -88,34 +81,34 @@ def buscar_coincidencias(data, valores_buscar):
             resultados[hoja] = df_filtrado
     return resultados
 
-# =========================
-# Interfaz Streamlit
-# =========================
-st.title("🔎 Control de Nómina Eventual - Búsqueda")
+# --- Interfaz con Streamlit ---
+st.title("Control de Nómina Eventual - Búsqueda")
 
-# Entrada para enlace de Google Sheets
-google_sheet_url = st.text_input(
-    "Pega aquí el enlace de Google Sheets (Excel en Drive):",
-    value="https://docs.google.com/spreadsheets/d/15H3ULUuPxBNo_nBHIjUdCiB1EK_ngAvZ/edit?usp=sharing"
-)
+# Botón para actualizar datos de base
+if st.button("Actualizar datos de base"):
+    cargar_datos_drive.clear()
+    st.success("La caché se ha limpiado. La próxima búsqueda descargará el archivo actualizado.")
 
-# Campos de búsqueda
+# ID fijo del archivo
+file_id = "17O33v9JmMsItavMNm7qw4MX2Zx_K7a2f"
+
+# Campos de búsqueda en dos columnas
 col1, col2 = st.columns(2)
-rfc = col1.text_input("RFC")
-nombre = col2.text_input("NOMBRE")
+rfc = col1.text_input("RFC", key="rfc")
+nombre = col2.text_input("NOMBRE", key="nombre")
 
 col3, col4 = st.columns(2)
-oficio_solicitud = col3.text_input("OFICIO DE SOLICITUD")
-adscripcion = col4.text_input("ADSCRIPCION")
+oficio_solicitud = col3.text_input("OFICIO DE SOLICITUD", key="oficio_solicitud")
+adscripcion = col4.text_input("ADSCRIPCION", key="adscripcion")
 
 col5, col6 = st.columns(2)
-cuenta = col5.text_input("CUENTA")
-oficio_elaborado = col6.text_input("OFICIO ELABORADO")
+cuenta = col5.text_input("CUENTA", key="cuenta")
+oficio_elaborado = col6.text_input("OFICIO ELABORADO", key="oficio_elaborado")
 
 # Botón de búsqueda
-if google_sheet_url and st.button("Buscar"):
+if st.button("Buscar"):
     try:
-        data = cargar_datos_excel(google_sheet_url, hojas_destino)
+        data = cargar_datos_drive(file_id, hojas_destino)
         valores = [
             rfc.strip(), nombre.strip(), oficio_solicitud.strip(),
             adscripcion.strip(), cuenta.strip(), oficio_elaborado.strip()
@@ -126,30 +119,23 @@ if google_sheet_url and st.button("Buscar"):
             st.info("No se encontraron coincidencias.")
         else:
             for hoja, df_res in resultados.items():
-                st.subheader(f"📄 Resultados en hoja: {hoja}")
-                st.dataframe(df_res, width=1500, height=180)
+                st.subheader(f"Resultados de '{hoja}'")
+                # Contenedor con scroll horizontal y vertical, solo 5 filas visibles
+                st.dataframe(df_res, width=1500, height=180)  # altura aprox. 5 filas
     except Exception as e:
         st.error(f"Error al procesar: {e}")
 
+# Botón de limpiar
+if st.button("Limpiar"):
+    st.experimental_rerun()
+
 # =========================
-# Pie de página fijo
+# Pie de página
 # =========================
 st.markdown(
     """
-    <style>
-    .footer {
-        position: fixed;
-        left: 0;
-        bottom: 0;
-        width: 100%;
-        text-align: center;
-        font-size: 12px;
-        color: gray;
-        padding: 5px;
-        background-color: #f9f9f9;
-    }
-    </style>
-    <div class="footer">
+    <hr>
+    <div style='text-align: center; font-size: 12px; color: gray;'>
         © Derechos Reservados. LACB  =)
     </div>
     """,
