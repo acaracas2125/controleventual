@@ -34,14 +34,25 @@ if not os.path.exists(MENSAJE_FILE):
 # Funciones de seguridad y login
 # =========================
 def cargar_usuarios():
-    return pd.read_csv(USUARIOS_FILE)
-
-def guardar_usuarios(df):
-    df.to_csv(USUARIOS_FILE, index=False)
+    if not os.path.exists(USUARIOS_FILE):
+        # Crear CSV inicial si no existe
+        df = pd.DataFrame([{
+            "usuario": "acaracas",
+            "contraseña": hashlib.sha256("prueba1234".encode()).hexdigest(),
+            "nombre_completo": "Ángel Caracas",
+            "rol": "maestro"
+        }])
+        df.to_csv(USUARIOS_FILE, index=False)
+    else:
+        df = pd.read_csv(USUARIOS_FILE)
+    # Validar columnas obligatorias
+    for col in ["usuario", "contraseña", "nombre_completo", "rol"]:
+        if col not in df.columns:
+            df[col] = ""
+    return df
 
 def verificar_usuario(usuario, password):
     df = cargar_usuarios()
-    df["contraseña"] = df["contraseña"].astype(str)
     hashed = hashlib.sha256(password.encode()).hexdigest()
     match = df[(df["usuario"]==usuario) & (df["contraseña"]==hashed)]
     if not match.empty:
@@ -259,3 +270,4 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
