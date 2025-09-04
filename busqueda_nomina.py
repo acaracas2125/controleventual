@@ -9,12 +9,10 @@ hojas_destino = [
     "CAMBIO DE ADSCRIPCION", "STATUS DE COMISION", "COMISIONES", "OFICIOS 2025-ENERO", "OFICIOS 2025-FEBRERO",
     "OFICIOS 2025-MARZO", "OFICIO 2025-JUNIO", "LIC. MARCELA.", "CONTRATOS", "MEMOS", "MTRA. NOELIA",
     "STATUS DE OFI. DEPÁCHADOS OLI", "COMISIONES (2)", "Hoja1 (5)", "NOMINA ACTUAL",
-    # Nuevas hojas
     "DIVERSOS", "FORMATOS DE DESC. DIV", "CHEQUES-REVERSOS", "PENSIONES Y FORMATOS"
 ]
 
 # Matriz de columnas condicionantes (RFC y Nombre)
-# RFC = columna B, Nombre = columna C para las nuevas hojas
 columnas_condicionantes = [
     ["C", "C", "", "D", "", "E", "E"] + [""] * 14 + ["C"] + ["B", "B", "B", "B"],  # RFC
     ["E", "D", "J", "E", "", "F", "F", "D", "C", "D", "C", "C", "C", "C", "E", "E", "E", "E", "E", "E", "D", "D"] + ["C", "C", "C", "C"],  # NOMBRE
@@ -126,7 +124,8 @@ if file_id and st.button("Buscar"):
         else:
             for hoja, df_res in resultados.items():
                 st.subheader(f"Resultados de '{hoja}'")
-                st.dataframe(df_res.head(200), use_container_width=True)
+                # Contenedor con scroll horizontal y vertical
+                st.dataframe(df_res, width=1500, height=600)
     except Exception as e:
         st.error(f"Error al procesar: {e}")
 
