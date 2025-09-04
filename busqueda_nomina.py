@@ -122,13 +122,15 @@ if file_id and st.button("Buscar"):
         if not resultados:
             st.info("No se encontraron coincidencias.")
         else:
-            for hoja, df_res in resultados.items():
-                st.subheader(f"Resultados de '{hoja}'")
-                # Contenedor con scroll horizontal y vertical
-                st.dataframe(df_res, width=1500, height=600)
+           for hoja, df_res in resultados.items():
+    st.subheader(f"Resultados de '{hoja}'")
+    # Contenedor con scroll horizontal y vertical, solo 5 filas visibles
+    st.dataframe(df_res, width=1500, height=180)
+
     except Exception as e:
         st.error(f"Error al procesar: {e}")
 
 # Botón de limpiar
 if st.button("Limpiar"):
     st.experimental_rerun()
+
