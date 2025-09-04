@@ -42,7 +42,7 @@ st.title("Prueba carga Google Sheets -> Excel -> CSV")
 
 google_sheet_url = st.text_input(
     "Enlace de Google Sheets",
-    value="https://docs.google.com/spreadsheets/d/15H3ULUuPxBNo_nBHIjUdCiB1EK_ngAvZ/edit?usp=drive_web&ouid=109199175635163763551&rtpof=true"
+    value="https://drive.usercontent.google.com/u/0/uc?id=15H3ULUuPxBNo_nBHIjUdCiB1EK_ngAvZ&export=download"
 )
 
 if google_sheet_url:
@@ -50,4 +50,5 @@ if google_sheet_url:
     if data:
         st.success("Archivo descargado y convertido a CSV en memoria.")
         st.write("Hojas cargadas:", list(data.keys()))
+
 
