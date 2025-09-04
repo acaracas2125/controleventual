@@ -1,5 +1,6 @@
 import pandas as pd
 import streamlit as st
+from io import BytesIO
 
 # Lista de hojas destino
 hojas_destino = [
@@ -9,7 +10,7 @@ hojas_destino = [
     "STATUS DE OFI. DEPÁCHADOS OLI", "COMISIONES (2)", "Hoja1 (5)", "NOMINA ACTUAL"
 ]
 
-# Matriz de columnas condicionantes
+# Matriz de columnas condicionantes (igual que antes)
 columnas_condicionantes = [
     ["C", "C", "", "D", "", "E", "E"] + [""] * 14 + ["C"],  # RFC
     ["E", "D", "J", "E", "", "F", "F", "D", "C", "D", "C", "C", "C", "C", "E", "E", "E", "E", "E", "E", "D", "D"],  # NOMBRE
@@ -19,7 +20,6 @@ columnas_condicionantes = [
     [""] * 7 + ["G", "A", "G", "A", "A", "A", "F", "C", "C", "C", "C", "C", "C", "B"] + [""]  # OFICIO ELABORADO
 ]
 
-# Función para convertir letra de columna a índice (A=0, B=1, etc.)
 def excel_col_to_index(col):
     col = col.upper()
     index = 0
@@ -27,26 +27,28 @@ def excel_col_to_index(col):
         index = index * 26 + (ord(char) - ord('A') + 1)
     return index - 1  # 0-based
 
-# Función para generar enlace de descarga directa desde Google Sheets
+# Convierte enlace de Google Sheets a descarga directa XLSX
 def gsheet_to_excel_url(google_url):
-    # Extraer el ID del archivo
     file_id = google_url.split("/d/")[1].split("/")[0]
-    # Generar enlace de exportación a Excel
     return f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
 
-# Cargar datos de Excel (solo hojas necesarias)
-@st.cache_data
-def cargar_datos(archivo, hojas):
+# Carga el Excel desde Google Drive y lo convierte a CSV en memoria
+@st.cache_data(show_spinner=True)
+def cargar_datos_csv(google_url, hojas):
+    url_excel = gsheet_to_excel_url(google_url)
     data = {}
+    xls = pd.ExcelFile(url_excel, engine='openpyxl')
     for hoja in hojas:
-        try:
-            df = pd.read_excel(archivo, sheet_name=hoja, engine="openpyxl")
-            data[hoja] = df
-        except Exception:
-            pass
+        if hoja in xls.sheet_names:
+            df = pd.read_excel(xls, sheet_name=hoja, engine='openpyxl')
+            # Convertir a CSV en memoria
+            csv_buffer = BytesIO()
+            df.to_csv(csv_buffer, index=False)
+            csv_buffer.seek(0)
+            df_csv = pd.read_csv(csv_buffer)
+            data[hoja] = df_csv
     return data
 
-# Función de búsqueda vectorizada
 def buscar_coincidencias(data, valores_buscar):
     resultados = {}
     for j, hoja in enumerate(hojas_destino):
@@ -73,17 +75,17 @@ def buscar_coincidencias(data, valores_buscar):
             resultados[hoja] = df_filtrado
     return resultados
 
-# Interfaz web con Streamlit
+# Interfaz web
 st.title("Control de Nómina Eventual - Búsqueda")
 
-# Enlace de Google Sheets
 google_sheet_url = st.text_input(
     "Enlace de Google Sheets",
     value="https://docs.google.com/spreadsheets/d/15H3ULUuPxBNo_nBHIjUdCiB1EK_ngAvZ/edit?usp=drive_link"
 )
 
-# Convertir a enlace de descarga directa
-archivo_excel = gsheet_to_excel_url(google_sheet_url) if google_sheet_url else None
+if google_sheet_url:
+    data = cargar_datos_csv(google_sheet_url, hojas_destino)
+    st.success("Datos cargados y convertidos a CSV en memoria. Las búsquedas serán mucho más rápidas ahora.")
 
 # Entradas de búsqueda
 rfc = st.text_input("RFC")
@@ -93,22 +95,18 @@ adscripcion = st.text_input("ADSCRIPCION")
 cuenta = st.text_input("CUENTA")
 oficio_elaborado = st.text_input("OFICIO ELABORADO")
 
-if archivo_excel and st.button("Buscar"):
-    try:
-        data = cargar_datos(archivo_excel, hojas_destino)
-        valores = [
-            rfc.strip(), nombre.strip(), oficio_solicitud.strip(),
-            adscripcion.strip(), cuenta.strip(), oficio_elaborado.strip()
-        ]
-        resultados = buscar_coincidencias(data, valores)
-        if not resultados:
-            st.info("No se encontraron coincidencias.")
-        else:
-            for hoja, df_res in resultados.items():
-                st.subheader(f"Resultados de '{hoja}'")
-                st.dataframe(df_res.head(200))  # muestra máximo 200 filas
-    except Exception as e:
-        st.error(f"Error al cargar el archivo: {e}")
+if st.button("Buscar"):
+    valores = [
+        rfc.strip(), nombre.strip(), oficio_solicitud.strip(),
+        adscripcion.strip(), cuenta.strip(), oficio_elaborado.strip()
+    ]
+    resultados = buscar_coincidencias(data, valores)
+    if not resultados:
+        st.info("No se encontraron coincidencias.")
+    else:
+        for hoja, df_res in resultados.items():
+            st.subheader(f"Resultados de '{hoja}'")
+            st.dataframe(df_res.head(200))
 
 if st.button("Limpiar"):
     st.experimental_rerun()
