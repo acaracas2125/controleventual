@@ -10,7 +10,6 @@ hojas_destino = [
 ]
 
 # Matriz de columnas condicionantes
-# (se agregó la última columna para "NOMINA ACTUAL")
 columnas_condicionantes = [
     ["C", "C", "", "D", "", "E", "E"] + [""] * 14 + ["C"],  # RFC
     ["E", "D", "J", "E", "", "F", "F", "D", "C", "D", "C", "C", "C", "C", "E", "E", "E", "E", "E", "E", "D", "D"],  # NOMBRE
@@ -27,6 +26,13 @@ def excel_col_to_index(col):
     for char in col:
         index = index * 26 + (ord(char) - ord('A') + 1)
     return index - 1  # 0-based
+
+# Función para generar enlace de descarga directa desde Google Sheets
+def gsheet_to_excel_url(google_url):
+    # Extraer el ID del archivo
+    file_id = google_url.split("/d/")[1].split("/")[0]
+    # Generar enlace de exportación a Excel
+    return f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
 
 # Cargar datos de Excel (solo hojas necesarias)
 @st.cache_data
@@ -70,11 +76,14 @@ def buscar_coincidencias(data, valores_buscar):
 # Interfaz web con Streamlit
 st.title("Control de Nómina Eventual - Búsqueda")
 
-# Ruta al archivo Excel
-archivo_excel = st.text_input(
-    "Ruta al archivo Excel",
-    value=r"C:\Users\USER-PC0045\Pictures\PAGINA EVENTUAL\control_nomina.xlsx"
+# Enlace de Google Sheets
+google_sheet_url = st.text_input(
+    "Enlace de Google Sheets",
+    value="https://docs.google.com/spreadsheets/d/15H3ULUuPxBNo_nBHIjUdCiB1EK_ngAvZ/edit?usp=drive_link"
 )
+
+# Convertir a enlace de descarga directa
+archivo_excel = gsheet_to_excel_url(google_sheet_url) if google_sheet_url else None
 
 # Entradas de búsqueda
 rfc = st.text_input("RFC")
