@@ -112,10 +112,6 @@ usuario_input = st.sidebar.text_input("Usuario")
 password_input = st.sidebar.text_input("Contraseña", type="password")
 login_btn = st.sidebar.button("Entrar")
 
-if not os.path.exists(USUARIOS_FILE):
-    st.error("Archivo de usuarios no encontrado.")
-    st.stop()
-
 usuarios_df = pd.read_csv(USUARIOS_FILE)
 usuario_valido = False
 rol_usuario = None
@@ -191,4 +187,10 @@ if st.button("Limpiar"):
 # =========================
 st.markdown(
     """
-    <
+    <hr>
+    <div style='text-align: center; font-size: 12px; color: gray;'>
+        © Derechos Reservados. LACB  =)
+    </div>
+    """,
+    unsafe_allow_html=True
+)
