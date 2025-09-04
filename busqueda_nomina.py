@@ -207,11 +207,22 @@ if criterio:
 # =========================
 st.markdown(
     """
-    <hr>
-    <div style='text-align: center; font-size: 12px; color: gray;'>
+    <style>
+    .footer {
+        position: fixed;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        text-align: center;
+        font-size: 12px;
+        color: gray;
+        padding: 5px;
+        background-color: #f9f9f9;
+    }
+    </style>
+    <div class="footer">
         © Derechos Reservados. LACB  =)
     </div>
     """,
     unsafe_allow_html=True
 )
-
