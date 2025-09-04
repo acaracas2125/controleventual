@@ -29,13 +29,19 @@ def excel_col_to_index(col):
         index = index * 26 + (ord(char) - ord('A') + 1)
     return index - 1  # 0-based
 
-# Descargar y cargar Excel desde Google Drive
+# Descargar y cargar Excel desde Google Drive con validación
 @st.cache_data(show_spinner="Descargando y procesando Excel desde Google Drive...")
 def cargar_datos_drive(file_id, hojas):
     url = f"https://drive.google.com/uc?export=download&id={file_id}"
     resp = requests.get(url)
+    
     if resp.status_code != 200:
         st.error("No se pudo descargar el archivo desde Google Drive. Verifica permisos o el ID.")
+        return {}
+    
+    # Validar que sea un Excel (.xlsx)
+    if not resp.content[:2] == b'PK':
+        st.error("El archivo descargado no es un Excel válido. Verifica el ID o permisos.")
         return {}
     
     xls = pd.ExcelFile(BytesIO(resp.content), engine="openpyxl")
@@ -80,8 +86,8 @@ st.title("Control de Nómina Eventual - Búsqueda")
 
 # Entrada para el ID de Google Drive
 file_id = st.text_input(
-    "ID del archivo en Google Drive (ejemplo: 15H3ULUuPxBNo_nBHIjUdCiB1EK_ngAvZ):",
-    value="10eM-gq5Oth8S2oWIfKR75fGGGDWWhaXD"
+    "ID del archivo en Google Drive:",
+    value="17O33v9JmMsItavMNm7qw4MX2Zx_K7a2f"
 )
 
 # Entradas de búsqueda
@@ -112,4 +118,3 @@ if file_id and st.button("Buscar"):
 
 if st.button("Limpiar"):
     st.experimental_rerun()
-
