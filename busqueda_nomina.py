@@ -84,6 +84,11 @@ def buscar_coincidencias(data, valores_buscar):
 # --- Interfaz con Streamlit ---
 st.title("Control de Nómina Eventual - Búsqueda")
 
+# Botón para actualizar datos de base
+if st.button("Actualizar datos de base"):
+    cargar_datos_drive.clear()
+    st.success("La caché se ha limpiado. La próxima búsqueda descargará el archivo actualizado.")
+
 # Entrada para el ID de Google Drive
 file_id = st.text_input(
     "ID del archivo en Google Drive:",
