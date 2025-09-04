@@ -95,6 +95,49 @@ file_id = st.text_input(
     value="17O33v9JmMsItavMNm7qw4MX2Zx_K7a2f"
 )
 
+# --- Campos de búsqueda en dos columnas ---
+col1, col2 = st.columns(2)
+rfc = col1.text_input("RFC")
+nombre = col2.text_input("NOMBRE")
+
+col3, col4 = st.columns(2)
+oficio_solicitud = col3.text_input("OFICIO DE SOLICITUD")
+adscripcion = col4.text_input("ADSCRIPCION")
+
+col5, col6 = st.columns(2)
+cuenta = col5.text_input("CUENTA")
+oficio_elaborado = col6.text_input("OFICIO ELABORADO")
+
+# Botón de búsqueda
+if file_id and st.button("Buscar"):
+    try:
+        data = cargar_datos_drive(file_id, hojas_destino)
+        valores = [
+            rfc.strip(), nombre.strip(), oficio_solicitud.strip(),
+            adscripcion.strip(), cuenta.strip(), oficio_elaborado.strip()
+        ]
+        resultados = buscar_coincidencias(data, valores)
+
+        if not resultados:
+            st.info("No se encontraron coincidencias.")
+        else:
+            for hoja, df_res in resultados.items():
+                st.subheader(f"Resultados de '{hoja}'")
+                # Mostrar el dataframe ocupando todo el ancho disponible
+                st.dataframe(df_res.head(200), use_container_width=True)
+    except Exception as e:
+        st.error(f"Error al procesar: {e}")
+
+# Botón de limpiar
+if st.button("Limpiar"):
+    st.experimental_rerun()
+
+# Entrada para el ID de Google Drive
+file_id = st.text_input(
+    "ID del archivo en Google Drive:",
+    value="17O33v9JmMsItavMNm7qw4MX2Zx_K7a2f"
+)
+
 # Entradas de búsqueda
 rfc = st.text_input("RFC")
 nombre = st.text_input("NOMBRE")
@@ -123,3 +166,4 @@ if file_id and st.button("Buscar"):
 
 if st.button("Limpiar"):
     st.experimental_rerun()
+
