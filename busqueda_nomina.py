@@ -125,6 +125,8 @@ if file_id and st.button("Buscar"):
             for hoja, df_res in resultados.items():
                 st.subheader(f"Resultados de '{hoja}'")
                 st.dataframe(df_res.head(200), use_container_width=True)
+    except Exception as e:
+        st.error(f"Error al procesar: {e}")
 
 # Botón de limpiar
 if st.button("Limpiar"):
