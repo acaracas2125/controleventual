@@ -3,22 +3,25 @@ import streamlit as st
 import requests
 from io import BytesIO
 
-# Lista de hojas destino
+# Lista de hojas destino (incluyendo nuevas)
 hojas_destino = [
     "NUEVO COSTEO", "COSTEO O.C.", "CORRES 2025", "BASE FEDERAL 2025", "BASE", "VALIDACION IMPROS", "REGISTRO REVERSOS",
     "CAMBIO DE ADSCRIPCION", "STATUS DE COMISION", "COMISIONES", "OFICIOS 2025-ENERO", "OFICIOS 2025-FEBRERO",
     "OFICIOS 2025-MARZO", "OFICIO 2025-JUNIO", "LIC. MARCELA.", "CONTRATOS", "MEMOS", "MTRA. NOELIA",
-    "STATUS DE OFI. DEPÁCHADOS OLI", "COMISIONES (2)", "Hoja1 (5)", "NOMINA ACTUAL"
+    "STATUS DE OFI. DEPÁCHADOS OLI", "COMISIONES (2)", "Hoja1 (5)", "NOMINA ACTUAL",
+    # Nuevas hojas
+    "DIVERSOS", "FORMATOS DE DESC. DIV", "CHEQUES-REVERSOS", "PENSIONES Y FORMATOS"
 ]
 
-# Matriz de columnas condicionantes
+# Matriz de columnas condicionantes (RFC y Nombre)
+# RFC = columna B, Nombre = columna C para las nuevas hojas
 columnas_condicionantes = [
-    ["C", "C", "", "D", "", "E", "E"] + [""] * 14 + ["C"],  # RFC
-    ["E", "D", "J", "E", "", "F", "F", "D", "C", "D", "C", "C", "C", "C", "E", "E", "E", "E", "E", "E", "D", "D"],  # NOMBRE
-    ["AC", "I", "D", "J", "", "", "", "B", "", "B", "", "", "", "A", "", "", "", "", "", "", "", ""],  # OFICIO SOLICITUD
-    ["P", "V", "D,I", "W", "", "L", "L", "", "D", "", "", "", "", "", "", "", "", "", "", "", "", "G"],  # ADSCRIPCION
-    ["AE", "X", "", "Y", "", "M", "M"] + [""] * 14 + ["O"],  # CUENTA
-    [""] * 7 + ["G", "A", "G", "A", "A", "A", "F", "C", "C", "C", "C", "C", "C", "B"] + [""]  # OFICIO ELABORADO
+    ["C", "C", "", "D", "", "E", "E"] + [""] * 14 + ["C"] + ["B", "B", "B", "B"],  # RFC
+    ["E", "D", "J", "E", "", "F", "F", "D", "C", "D", "C", "C", "C", "C", "E", "E", "E", "E", "E", "E", "D", "D"] + ["C", "C", "C", "C"],  # NOMBRE
+    ["AC", "I", "D", "J", "", "", "", "B", "", "B", "", "", "", "A", "", "", "", "", "", "", "", ""] + ["", "", "", ""],  # OFICIO SOLICITUD
+    ["P", "V", "D,I", "W", "", "L", "L", "", "D", "", "", "", "", "", "", "", "", "", "", "", "", "G"] + ["", "", "", ""],  # ADSCRIPCION
+    ["AE", "X", "", "Y", "", "M", "M"] + [""] * 14 + ["O"] + ["", "", "", ""],  # CUENTA
+    [""] * 7 + ["G", "A", "G", "A", "A", "A", "F", "C", "C", "C", "C", "C", "C", "B"] + [""] + ["", "", "", ""]  # OFICIO ELABORADO
 ]
 
 # Función para convertir letra de columna a índice (A=0, B=1, etc.)
@@ -29,7 +32,7 @@ def excel_col_to_index(col):
         index = index * 26 + (ord(char) - ord('A') + 1)
     return index - 1  # 0-based
 
-# Descargar y cargar Excel desde Google Drive con validación
+# Descargar y cargar Excel desde Google Drive
 @st.cache_data(show_spinner="Descargando y procesando Excel desde Google Drive...")
 def cargar_datos_drive(file_id, hojas):
     url = f"https://drive.google.com/uc?export=download&id={file_id}"
@@ -39,7 +42,6 @@ def cargar_datos_drive(file_id, hojas):
         st.error("No se pudo descargar el archivo desde Google Drive. Verifica permisos o el ID.")
         return {}
     
-    # Validar que sea un Excel (.xlsx)
     if not resp.content[:2] == b'PK':
         st.error("El archivo descargado no es un Excel válido. Verifica el ID o permisos.")
         return {}
@@ -96,7 +98,7 @@ file_id = st.text_input(
     key="file_id"
 )
 
-# --- Campos de búsqueda en dos columnas ---
+# Campos de búsqueda en dos columnas
 col1, col2 = st.columns(2)
 rfc = col1.text_input("RFC", key="rfc")
 nombre = col2.text_input("NOMBRE", key="nombre")
