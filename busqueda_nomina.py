@@ -81,7 +81,7 @@ st.title("Control de Nómina Eventual - Búsqueda")
 # Entrada para el ID de Google Drive
 file_id = st.text_input(
     "ID del archivo en Google Drive (ejemplo: 15H3ULUuPxBNo_nBHIjUdCiB1EK_ngAvZ):",
-    value="15H3ULUuPxBNo_nBHIjUdCiB1EK_ngAvZ"
+    value="10eM-gq5Oth8S2oWIfKR75fGGGDWWhaXD"
 )
 
 # Entradas de búsqueda
@@ -112,3 +112,4 @@ if file_id and st.button("Buscar"):
 
 if st.button("Limpiar"):
     st.experimental_rerun()
+
