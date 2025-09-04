@@ -132,3 +132,86 @@ if file_id and st.button("Buscar"):
 # Botón de limpiar
 if st.button("Limpiar"):
     st.experimental_rerun()
+import streamlit as st
+import pandas as pd
+import requests
+from io import BytesIO
+
+# =========================
+# Función para convertir enlace de Google Sheets/Drive a Excel
+# =========================
+def gsheet_to_excel_url(google_url: str) -> str:
+    """
+    Convierte cualquier URL de Google Sheets o Drive en un enlace de descarga directa XLSX.
+    """
+    if "/d/" in google_url:
+        try:
+            file_id = google_url.split("/d/")[1].split("/")[0]
+            return f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
+        except Exception:
+            raise ValueError("No se pudo extraer el ID del archivo de Google Sheets.")
+    else:
+        raise ValueError("El enlace de Google Sheets no es válido. Debe contener '/d/'.")
+
+# =========================
+# Cargar datos desde Google Sheets con cache
+# =========================
+@st.cache_data
+def cargar_datos_excel(google_url: str, hojas: list):
+    url_excel = gsheet_to_excel_url(google_url)
+    r = requests.get(url_excel)
+    r.raise_for_status()
+    file = BytesIO(r.content)
+    data = pd.read_excel(file, sheet_name=hojas)
+    return data
+
+# =========================
+# App principal
+# =========================
+st.title("🔎 Búsqueda en Nómina Eventual")
+
+# Pega aquí tu enlace de Google Sheets
+google_sheet_url = "https://docs.google.com/spreadsheets/d/15H3ULUuPxBNo_nBHIjUdCiB1EK_ngAvZ/edit?usp=sharing"
+
+# Define las hojas que quieres leer
+hojas_destino = ["BASE", "NUEVO COSTEO", "NOMINA ACTUAL"]
+
+try:
+    data = cargar_datos_excel(google_sheet_url, hojas_destino)
+    st.success("✅ Datos cargados correctamente.")
+except Exception as e:
+    st.error(f"Error al cargar los datos: {e}")
+    st.stop()
+
+# Input para búsqueda
+criterio = st.text_input("Escribe un CURP, RFC o Nombre:")
+
+if criterio:
+    criterio = criterio.strip().lower()
+    resultados = []
+    
+    for hoja, df in data.items():
+        df_str = df.astype(str).apply(lambda x: x.str.lower())
+        coincidencias = df[df_str.apply(lambda x: x.str.contains(criterio, na=False)).any(axis=1)]
+        
+        if not coincidencias.empty:
+            st.subheader(f"📄 Resultados en hoja: {hoja}")
+            st.dataframe(coincidencias)
+            resultados.append(coincidencias)
+    
+    if not resultados:
+        st.warning("⚠️ No se encontraron coincidencias.")
+
+# =========================
+# Pie de página
+# =========================
+st.markdown(
+    """
+    <hr>
+    <div style='text-align: center; font-size: 12px; color: gray;'>
+        © Derechos Reservados. LACB  =)
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
