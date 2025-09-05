@@ -214,14 +214,15 @@ if st.session_state.rol == "maestro":
 # Campos de búsqueda
 # =========================
 col1, col2 = st.columns(2)
-rfc = col1.text_input("RFC", key="rfc")
-nombre = col2.text_input("NOMBRE", key="nombre")
+rfc = col1.text_input("RFC", key="rfc_busqueda")
+nombre = col2.text_input("NOMBRE", key="nombre_busqueda")
 col3, col4 = st.columns(2)
-oficio_solicitud = col3.text_input("OFICIO DE SOLICITUD", key="oficio_solicitud")
-adscripcion = col4.text_input("ADSCRIPCION", key="adscripcion")
+oficio_solicitud = col3.text_input("OFICIO DE SOLICITUD", key="oficio_solicitud_busqueda")
+adscripcion = col4.text_input("ADSCRIPCION", key="adscripcion_busqueda")
 col5, col6 = st.columns(2)
-cuenta = col5.text_input("CUENTA", key="cuenta")
-oficio_elaborado = col6.text_input("OFICIO ELABORADO", key="oficio_elaborado")
+cuenta = col5.text_input("CUENTA", key="cuenta_busqueda")
+oficio_elaborado = col6.text_input("OFICIO ELABORADO", key="oficio_elaborado_busqueda")
+
 
 # =========================
 # Botón buscar
@@ -272,3 +273,4 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
