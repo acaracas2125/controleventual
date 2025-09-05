@@ -20,7 +20,17 @@ if not os.path.exists(USUARIOS_FILE):
     df = pd.DataFrame([["acaracas", hash_password("caracas"), "maestro", "Administrador"]], 
                       columns=["usuario", "password", "rol", "nombre"])
     df.to_csv(USUARIOS_FILE, index=False)
-
+else:
+    usuarios_df = pd.read_csv(USUARIOS_FILE)
+    if "acaracas" not in usuarios_df["usuario"].values:
+        nuevo_usuario_df = pd.DataFrame([{
+            "usuario": "acaracas",
+            "password": hash_password("caracas"),
+            "rol": "maestro",
+            "nombre": "Administrador"
+        }])
+        usuarios_df = pd.concat([usuarios_df, nuevo_usuario_df], ignore_index=True)
+        usuarios_df.to_csv(USUARIOS_FILE, index=False)
 # Crear archivo mensaje si no existe
 if not os.path.exists(MENSAJE_FILE):
     pd.DataFrame([{"mensaje": "Bienvenido"}]).to_csv(MENSAJE_FILE, index=False)
@@ -229,3 +239,4 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
