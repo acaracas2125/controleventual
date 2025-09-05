@@ -46,7 +46,14 @@ def crear_usuario_maestro():
 
 def cargar_usuarios():
     crear_usuario_maestro()
-    return pd.read_csv(USUARIOS_FILE)
+    df = pd.read_csv(USUARIOS_FILE)
+    # Asegurarse de que es_maestro sea booleano
+    if 'es_maestro' in df.columns:
+        df['es_maestro'] = df['es_maestro'].astype(bool)
+    else:
+        # Si no existe, agregar columna
+        df['es_maestro'] = False
+    return df
 
 def guardar_usuarios(df):
     df.to_csv(USUARIOS_FILE, index=False)
@@ -243,3 +250,4 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
