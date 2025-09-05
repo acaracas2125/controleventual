@@ -214,6 +214,16 @@ if rol_usuario == "maestro":
             st.sidebar.success("Mensaje actualizado")
 
 # =========================
+# Botón cerrar sesión
+# =========================
+if st.sidebar.button("Cerrar sesión"):
+    for key in ["usuario_valido", "rol_usuario", "nombre_usuario"]:
+        if key in st.session_state:
+            del st.session_state[key]
+    st.experimental_rerun()
+
+
+# =========================
 # Campos de búsqueda
 # =========================
 col1, col2 = st.columns(2)
@@ -275,3 +285,4 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
