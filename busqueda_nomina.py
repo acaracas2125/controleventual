@@ -37,6 +37,7 @@ def crear_usuario_maestro():
     if not os.path.exists(USUARIOS_FILE):
         df = pd.DataFrame([{
             "usuario": "acaracas",
+            usuarios_df.columns = usuarios_df.columns.str.strip()  # Elimina espacios al inicio y fin
             "contraseña": hash_password("prueba1234"),
             "nombre_completo": "Angel Caracas",
             "mensaje_bienvenida": "Bienvenido",
@@ -250,4 +251,5 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
