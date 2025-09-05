@@ -6,31 +6,23 @@ import os
 import hashlib
 
 # =========================
-# Configuración de usuarios
+# Configuración de archivos
 # =========================
 USUARIOS_FILE = "usuarios.csv"
 CONSULTAS_FILE = "consultas.csv"
 MENSAJE_FILE = "mensaje_bienvenida.txt"
 
+# =========================
+# Funciones de seguridad
+# =========================
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 # Crear usuario maestro si no existe
 if not os.path.exists(USUARIOS_FILE):
     df = pd.DataFrame([["acaracas", hash_password("caracas"), "maestro", "Administrador"]],
-                      columns=["usuario", "password", "rol", "nombre"])
+                      columns=["usuario","password","rol","nombre"])
     df.to_csv(USUARIOS_FILE, index=False)
-else:
-    usuarios_df = pd.read_csv(USUARIOS_FILE)
-    if "acaracas" not in usuarios_df["usuario"].values:
-        nuevo_usuario_df = pd.DataFrame([{
-            "usuario": "acaracas",
-            "password": hash_password("caracas"),
-            "rol": "maestro",
-            "nombre": "Administrador"
-        }])
-        usuarios_df = pd.concat([usuarios_df, nuevo_usuario_df], ignore_index=True)
-        usuarios_df.to_csv(USUARIOS_FILE, index=False)
 
 # =========================
 # Funciones de Excel
@@ -108,7 +100,9 @@ def buscar_coincidencias(data, valores_buscar):
 # =========================
 st.title("Control de Nómina Eventual - Búsqueda")
 
+# =========================
 # Login
+# =========================
 st.sidebar.title("🔑 Iniciar sesión")
 usuario_input = st.sidebar.text_input("Usuario")
 password_input = st.sidebar.text_input("Contraseña", type="password")
@@ -117,7 +111,7 @@ login_btn = st.sidebar.button("Entrar")
 usuarios_df = pd.read_csv(USUARIOS_FILE)
 usuario_valido = False
 rol_usuario = None
-nombre_usuario = ""
+nombre_usuario = None
 
 if login_btn:
     hash_input = hash_password(password_input)
@@ -126,7 +120,7 @@ if login_btn:
         usuario_valido = True
         rol_usuario = match.iloc[0]["rol"]
         nombre_usuario = match.iloc[0]["nombre"]
-        # Cargar mensaje de bienvenida
+        # Mensaje de bienvenida
         if os.path.exists(MENSAJE_FILE):
             with open(MENSAJE_FILE, "r", encoding="utf-8") as f:
                 mensaje_bienvenida = f.read()
@@ -139,10 +133,11 @@ if login_btn:
 if not login_btn or not usuario_valido:
     st.stop()
 
-# ID fijo del archivo
+# =========================
+# Botón actualizar datos solo maestro
+# =========================
 file_id = "17O33v9JmMsItavMNm7qw4MX2Zx_K7a2f"
 
-# Botón actualizar datos solo para maestro
 if rol_usuario == "maestro":
     if st.button("Actualizar datos de base"):
         cargar_datos_drive.clear()
@@ -153,42 +148,48 @@ if rol_usuario == "maestro":
 # =========================
 if rol_usuario == "maestro":
     st.sidebar.subheader("👥 Administración de usuarios")
-    st.sidebar.text("Agregar / Eliminar usuarios")
+    menu_admin = st.sidebar.selectbox("Selecciona acción", ["--", "Agregar usuario", "Eliminar usuario", "Editar usuario", "Editar mensaje bienvenida"])
 
-    # Agregar usuario
-    with st.sidebar.expander("Agregar usuario"):
-        nuevo_usuario = st.text_input("Usuario")
-        nueva_contraseña = st.text_input("Contraseña", type="password")
-        rol_nuevo = st.selectbox("Rol", ["usuario", "maestro"])
-        nombre_nuevo = st.text_input("Nombre completo")
-        if st.button("Agregar"):
-            if nuevo_usuario and nueva_contraseña:
-                hash_pass = hash_password(nueva_contraseña)
-                nuevo_df = pd.DataFrame([{
-                    "usuario": nuevo_usuario,
-                    "password": hash_pass,
-                    "rol": rol_nuevo,
-                    "nombre": nombre_nuevo
-                }])
-                usuarios_df = pd.concat([usuarios_df, nuevo_df], ignore_index=True)
+    if menu_admin == "Agregar usuario":
+        nuevo_usuario = st.sidebar.text_input("Usuario nuevo")
+        nuevo_password = st.sidebar.text_input("Contraseña", type="password")
+        nuevo_rol = st.sidebar.selectbox("Rol", ["usuario", "maestro"])
+        nuevo_nombre = st.sidebar.text_input("Nombre completo")
+        if st.sidebar.button("Guardar nuevo usuario"):
+            if nuevo_usuario and nuevo_password:
+                df_nuevo = pd.DataFrame([[nuevo_usuario, hash_password(nuevo_password), nuevo_rol, nuevo_nombre]],
+                                        columns=["usuario","password","rol","nombre"])
+                usuarios_df = pd.concat([usuarios_df, df_nuevo], ignore_index=True)
                 usuarios_df.to_csv(USUARIOS_FILE, index=False)
-                st.success(f"Usuario {nuevo_usuario} agregado")
+                st.sidebar.success("Usuario agregado correctamente")
 
-    # Eliminar usuario
-    with st.sidebar.expander("Eliminar usuario"):
-        usuario_eliminar = st.selectbox("Selecciona usuario", usuarios_df["usuario"].tolist())
-        if st.button("Eliminar"):
-            usuarios_df = usuarios_df[usuarios_df["usuario"] != usuario_eliminar]
+    elif menu_admin == "Eliminar usuario":
+        seleccionar_usuario = st.sidebar.selectbox("Selecciona usuario a eliminar", usuarios_df["usuario"])
+        if st.sidebar.button("Eliminar"):
+            usuarios_df = usuarios_df[usuarios_df["usuario"] != seleccionar_usuario]
             usuarios_df.to_csv(USUARIOS_FILE, index=False)
-            st.success(f"Usuario {usuario_eliminar} eliminado")
+            st.sidebar.success("Usuario eliminado")
 
-    # Mensaje de bienvenida editable
-    with st.sidebar.expander("Mensaje de bienvenida"):
-        nuevo_mensaje = st.text_area("Mensaje para los usuarios", value=mensaje_bienvenida)
-        if st.button("Guardar mensaje"):
+    elif menu_admin == "Editar usuario":
+        seleccionar_usuario = st.sidebar.selectbox("Selecciona usuario a editar", usuarios_df["usuario"])
+        nueva_password = st.sidebar.text_input("Nueva contraseña", type="password")
+        nuevo_rol = st.sidebar.selectbox("Nuevo rol", ["usuario", "maestro"])
+        nuevo_nombre = st.sidebar.text_input("Nuevo nombre completo")
+        if st.sidebar.button("Guardar cambios"):
+            if nueva_password:
+                usuarios_df.loc[usuarios_df["usuario"] == seleccionar_usuario, "password"] = hash_password(nueva_password)
+            usuarios_df.loc[usuarios_df["usuario"] == seleccionar_usuario, "rol"] = nuevo_rol
+            if nuevo_nombre:
+                usuarios_df.loc[usuarios_df["usuario"] == seleccionar_usuario, "nombre"] = nuevo_nombre
+            usuarios_df.to_csv(USUARIOS_FILE, index=False)
+            st.sidebar.success("Usuario actualizado")
+
+    elif menu_admin == "Editar mensaje bienvenida":
+        nuevo_mensaje = st.sidebar.text_input("Mensaje de bienvenida", value=mensaje_bienvenida)
+        if st.sidebar.button("Guardar mensaje"):
             with open(MENSAJE_FILE, "w", encoding="utf-8") as f:
                 f.write(nuevo_mensaje)
-            st.success("Mensaje actualizado")
+            st.sidebar.success("Mensaje actualizado")
 
 # =========================
 # Campos de búsqueda
@@ -203,7 +204,9 @@ col5, col6 = st.columns(2)
 cuenta = col5.text_input("CUENTA", key="cuenta")
 oficio_elaborado = col6.text_input("OFICIO ELABORADO", key="oficio_elaborado")
 
+# =========================
 # Botón buscar
+# =========================
 if st.button("Buscar"):
     try:
         data = cargar_datos_drive(file_id, hojas_destino)
@@ -232,7 +235,9 @@ if st.button("Buscar"):
     except Exception as e:
         st.error(f"Error al procesar: {e}")
 
+# =========================
 # Limpiar
+# =========================
 if st.button("Limpiar"):
     st.experimental_rerun()
 
