@@ -6,34 +6,32 @@ import os
 import hashlib
 
 # =========================
-# Configuración de usuarios
+# Configuración de archivos
 # =========================
 USUARIOS_FILE = "usuarios.csv"
 CONSULTAS_FILE = "consultas.csv"
-MENSAJE_FILE = "mensaje.csv"
+MENSAJE_FILE = "mensaje_bienvenida.txt"
 
+# =========================
+# Funciones de usuarios
+# =========================
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
-# Crear usuario maestro si no existe
-if not os.path.exists(USUARIOS_FILE):
-    df = pd.DataFrame([["acaracas", hash_password("caracas"), "maestro", "Administrador"]], 
-                      columns=["usuario", "password", "rol", "nombre"])
+def cargar_usuarios():
+    if not os.path.exists(USUARIOS_FILE):
+        df = pd.DataFrame([["acaracas", hash_password("caracas"), "maestro", "Administrador"]], 
+                          columns=["usuario", "password", "rol", "nombre"])
+        df.to_csv(USUARIOS_FILE, index=False)
+    else:
+        df = pd.read_csv(USUARIOS_FILE)
+    return df
+
+def guardar_usuarios(df):
     df.to_csv(USUARIOS_FILE, index=False)
-else:
-    usuarios_df = pd.read_csv(USUARIOS_FILE)
-    if "acaracas" not in usuarios_df["usuario"].values:
-        nuevo_usuario_df = pd.DataFrame([{
-            "usuario": "acaracas",
-            "password": hash_password("caracas"),
-            "rol": "maestro",
-            "nombre": "Administrador"
-        }])
-        usuarios_df = pd.concat([usuarios_df, nuevo_usuario_df], ignore_index=True)
-        usuarios_df.to_csv(USUARIOS_FILE, index=False)
-# Crear archivo mensaje si no existe
-if not os.path.exists(MENSAJE_FILE):
-    pd.DataFrame([{"mensaje": "Bienvenido"}]).to_csv(MENSAJE_FILE, index=False)
+
+# Crear usuario maestro si no existe
+usuarios_df = cargar_usuarios()
 
 # =========================
 # Funciones de Excel
@@ -117,13 +115,13 @@ usuario_input = st.sidebar.text_input("Usuario")
 password_input = st.sidebar.text_input("Contraseña", type="password")
 login_btn = st.sidebar.button("Entrar")
 
-usuarios_df = pd.read_csv(USUARIOS_FILE)
-mensaje_df = pd.read_csv(MENSAJE_FILE)
-mensaje_bienvenida = mensaje_df["mensaje"].iloc[0]
-
 usuario_valido = False
 rol_usuario = None
-nombre_usuario = ""
+mensaje_bienvenida = "Bienvenido"
+
+if os.path.exists(MENSAJE_FILE):
+    with open(MENSAJE_FILE, "r") as f:
+        mensaje_bienvenida = f.read().strip()
 
 if login_btn:
     hash_input = hash_password(password_input)
@@ -131,10 +129,9 @@ if login_btn:
     if not match.empty:
         usuario_valido = True
         rol_usuario = match.iloc[0]["rol"]
-        nombre_usuario = match.iloc[0]["nombre"]
-        st.success(f"{mensaje_bienvenida}, {nombre_usuario} ({rol_usuario})")
+        st.sidebar.success(f"{mensaje_bienvenida} {usuario_input}")
     else:
-        st.error("Usuario o contraseña incorrectos.")
+        st.sidebar.error("Usuario o contraseña incorrectos.")
 
 if not login_btn or not usuario_valido:
     st.stop()
@@ -142,48 +139,58 @@ if not login_btn or not usuario_valido:
 # ID fijo del archivo
 file_id = "17O33v9JmMsItavMNm7qw4MX2Zx_K7a2f"
 
-# Interfaz de administración de usuarios (solo maestro)
-if rol_usuario == "maestro":
-    st.sidebar.subheader("⚙️ Administración de Usuarios")
-    menu = st.sidebar.selectbox("Selecciona acción", ["-", "Agregar Usuario", "Eliminar Usuario", "Editar Mensaje de Bienvenida"])
-
-    if menu == "Agregar Usuario":
-        nuevo_usuario = st.text_input("Usuario nuevo")
-        nuevo_password = st.text_input("Contraseña", type="password")
-        nuevo_nombre = st.text_input("Nombre completo")
-        rol_nuevo = st.selectbox("Rol", ["consulta", "maestro"])
-        if st.button("Agregar"):
-            hash_nueva = hash_password(nuevo_password)
-            nuevo_df = pd.DataFrame([{
-                "usuario": nuevo_usuario,
-                "password": hash_nueva,
-                "rol": rol_nuevo,
-                "nombre": nuevo_nombre
-            }])
-            usuarios_df = pd.concat([usuarios_df, nuevo_df], ignore_index=True)
-            usuarios_df.to_csv(USUARIOS_FILE, index=False)
-            st.success(f"Usuario {nuevo_usuario} agregado correctamente.")
-
-    elif menu == "Eliminar Usuario":
-        usuario_eliminar = st.selectbox("Selecciona usuario a eliminar", usuarios_df["usuario"].tolist())
-        if st.button("Eliminar"):
-            usuarios_df = usuarios_df[usuarios_df["usuario"] != usuario_eliminar]
-            usuarios_df.to_csv(USUARIOS_FILE, index=False)
-            st.success(f"Usuario {usuario_eliminar} eliminado.")
-
-    elif menu == "Editar Mensaje de Bienvenida":
-        nuevo_mensaje = st.text_input("Mensaje de bienvenida", value=mensaje_bienvenida)
-        if st.button("Guardar mensaje"):
-            pd.DataFrame([{"mensaje": nuevo_mensaje}]).to_csv(MENSAJE_FILE, index=False)
-            st.success("Mensaje de bienvenida actualizado.")
-
 # Botón actualizar datos solo para maestro
 if rol_usuario == "maestro":
     if st.button("Actualizar datos de base"):
         cargar_datos_drive.clear()
         st.success("Caché limpiada. La próxima búsqueda descargará el archivo actualizado.")
 
+    # =========================
+    # Menú de administración de usuarios
+    # =========================
+    st.sidebar.subheader("⚙️ Administración de usuarios")
+    menu_opcion = st.sidebar.selectbox("Selecciona acción", ["Ver usuarios", "Agregar usuario", "Eliminar usuario", "Editar mensaje de bienvenida"])
+
+    if menu_opcion == "Ver usuarios":
+        st.write(usuarios_df)
+
+    elif menu_opcion == "Agregar usuario":
+        nuevo_usuario = st.text_input("Usuario")
+        nueva_contra = st.text_input("Contraseña", type="password")
+        rol_nuevo = st.selectbox("Rol", ["usuario", "maestro"])
+        nombre_completo = st.text_input("Nombre completo")
+        if st.button("Agregar"):
+            if nuevo_usuario and nueva_contra and rol_nuevo:
+                hash_nueva = hash_password(nueva_contra)
+                usuarios_df = pd.concat([usuarios_df, pd.DataFrame([{
+                    "usuario": nuevo_usuario,
+                    "password": hash_nueva,
+                    "rol": rol_nuevo,
+                    "nombre": nombre_completo
+                }])], ignore_index=True)
+                guardar_usuarios(usuarios_df)
+                st.success(f"Usuario {nuevo_usuario} agregado.")
+
+    elif menu_opcion == "Eliminar usuario":
+        usuario_eliminar = st.selectbox("Selecciona usuario a eliminar", usuarios_df["usuario"])
+        if st.button("Eliminar"):
+            if usuario_eliminar != "acaracas":
+                usuarios_df = usuarios_df[usuarios_df["usuario"] != usuario_eliminar]
+                guardar_usuarios(usuarios_df)
+                st.success(f"Usuario {usuario_eliminar} eliminado.")
+            else:
+                st.error("No puedes eliminar al usuario maestro.")
+
+    elif menu_opcion == "Editar mensaje de bienvenida":
+        nuevo_mensaje = st.text_input("Mensaje de bienvenida", value=mensaje_bienvenida)
+        if st.button("Guardar mensaje"):
+            with open(MENSAJE_FILE, "w") as f:
+                f.write(nuevo_mensaje)
+            st.success("Mensaje actualizado.")
+
+# =========================
 # Campos de búsqueda
+# =========================
 col1, col2 = st.columns(2)
 rfc = col1.text_input("RFC", key="rfc")
 nombre = col2.text_input("NOMBRE", key="nombre")
@@ -202,14 +209,10 @@ if st.button("Buscar"):
         resultados = buscar_coincidencias(data, valores)
 
         # Guardar consultas
-        consulta = {
-            "usuario": usuario_input,
-            "criterios": str(valores)
-        }
+        consulta = {"usuario": usuario_input, "criterios": str(valores)}
         if os.path.exists(CONSULTAS_FILE):
             consultas_df = pd.read_csv(CONSULTAS_FILE)
-            nuevo_df = pd.DataFrame([consulta])
-            consultas_df = pd.concat([consultas_df, nuevo_df], ignore_index=True)
+            consultas_df = pd.concat([consultas_df, pd.DataFrame([consulta])], ignore_index=True)
         else:
             consultas_df = pd.DataFrame([consulta])
         consultas_df.to_csv(CONSULTAS_FILE, index=False)
@@ -239,4 +242,3 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
