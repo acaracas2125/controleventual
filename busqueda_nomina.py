@@ -10,22 +10,24 @@ import hashlib
 # =========================
 USUARIOS_FILE = "usuarios.csv"
 CONSULTAS_FILE = "consultas.csv"
+MENSAJE_FILE = "mensaje_bienvenida.txt"
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 # Crear usuario maestro si no existe
 if not os.path.exists(USUARIOS_FILE):
-    df = pd.DataFrame([["acaracas", hash_password("prueba1234"), "maestro"]],
-                      columns=["usuario", "password", "rol"])
+    df = pd.DataFrame([["acaracas", hash_password("caracas"), "maestro", "Administrador"]],
+                      columns=["usuario", "password", "rol", "nombre"])
     df.to_csv(USUARIOS_FILE, index=False)
 else:
     usuarios_df = pd.read_csv(USUARIOS_FILE)
     if "acaracas" not in usuarios_df["usuario"].values:
         nuevo_usuario_df = pd.DataFrame([{
             "usuario": "acaracas",
-            "password": hash_password("prueba1234"),
-            "rol": "maestro"
+            "password": hash_password("caracas"),
+            "rol": "maestro",
+            "nombre": "Administrador"
         }])
         usuarios_df = pd.concat([usuarios_df, nuevo_usuario_df], ignore_index=True)
         usuarios_df.to_csv(USUARIOS_FILE, index=False)
@@ -115,6 +117,7 @@ login_btn = st.sidebar.button("Entrar")
 usuarios_df = pd.read_csv(USUARIOS_FILE)
 usuario_valido = False
 rol_usuario = None
+nombre_usuario = ""
 
 if login_btn:
     hash_input = hash_password(password_input)
@@ -122,7 +125,14 @@ if login_btn:
     if not match.empty:
         usuario_valido = True
         rol_usuario = match.iloc[0]["rol"]
-        st.success(f"Bienvenido {usuario_input} ({rol_usuario})")
+        nombre_usuario = match.iloc[0]["nombre"]
+        # Cargar mensaje de bienvenida
+        if os.path.exists(MENSAJE_FILE):
+            with open(MENSAJE_FILE, "r", encoding="utf-8") as f:
+                mensaje_bienvenida = f.read()
+        else:
+            mensaje_bienvenida = "Bienvenido"
+        st.success(f"{mensaje_bienvenida}, {nombre_usuario} ({rol_usuario})")
     else:
         st.error("Usuario o contraseña incorrectos.")
 
@@ -138,7 +148,51 @@ if rol_usuario == "maestro":
         cargar_datos_drive.clear()
         st.success("Caché limpiada. La próxima búsqueda descargará el archivo actualizado.")
 
+# =========================
+# Administración de usuarios (solo maestro)
+# =========================
+if rol_usuario == "maestro":
+    st.sidebar.subheader("👥 Administración de usuarios")
+    st.sidebar.text("Agregar / Eliminar usuarios")
+
+    # Agregar usuario
+    with st.sidebar.expander("Agregar usuario"):
+        nuevo_usuario = st.text_input("Usuario")
+        nueva_contraseña = st.text_input("Contraseña", type="password")
+        rol_nuevo = st.selectbox("Rol", ["usuario", "maestro"])
+        nombre_nuevo = st.text_input("Nombre completo")
+        if st.button("Agregar"):
+            if nuevo_usuario and nueva_contraseña:
+                hash_pass = hash_password(nueva_contraseña)
+                nuevo_df = pd.DataFrame([{
+                    "usuario": nuevo_usuario,
+                    "password": hash_pass,
+                    "rol": rol_nuevo,
+                    "nombre": nombre_nuevo
+                }])
+                usuarios_df = pd.concat([usuarios_df, nuevo_df], ignore_index=True)
+                usuarios_df.to_csv(USUARIOS_FILE, index=False)
+                st.success(f"Usuario {nuevo_usuario} agregado")
+
+    # Eliminar usuario
+    with st.sidebar.expander("Eliminar usuario"):
+        usuario_eliminar = st.selectbox("Selecciona usuario", usuarios_df["usuario"].tolist())
+        if st.button("Eliminar"):
+            usuarios_df = usuarios_df[usuarios_df["usuario"] != usuario_eliminar]
+            usuarios_df.to_csv(USUARIOS_FILE, index=False)
+            st.success(f"Usuario {usuario_eliminar} eliminado")
+
+    # Mensaje de bienvenida editable
+    with st.sidebar.expander("Mensaje de bienvenida"):
+        nuevo_mensaje = st.text_area("Mensaje para los usuarios", value=mensaje_bienvenida)
+        if st.button("Guardar mensaje"):
+            with open(MENSAJE_FILE, "w", encoding="utf-8") as f:
+                f.write(nuevo_mensaje)
+            st.success("Mensaje actualizado")
+
+# =========================
 # Campos de búsqueda
+# =========================
 col1, col2 = st.columns(2)
 rfc = col1.text_input("RFC", key="rfc")
 nombre = col2.text_input("NOMBRE", key="nombre")
