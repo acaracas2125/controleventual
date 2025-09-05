@@ -115,36 +115,35 @@ st.title("Control de Nómina Eventual - Búsqueda")
 # =========================
 st.sidebar.title("🔑 Iniciar sesión")
 
-# Estado de sesión
-if "login" not in st.session_state:
-    st.session_state.login = False
+if "logueado" not in st.session_state:
+    st.session_state.logueado = False
     st.session_state.usuario = None
     st.session_state.rol = None
-    st.session_state.nombre = None
 
-if not st.session_state.login:
-    usuario_input = st.sidebar.text_input("Usuario")
-    password_input = st.sidebar.text_input("Contraseña", type="password")
+if not st.session_state.logueado:
+    usuario_input = st.sidebar.text_input("Usuario", key="usuario_login")
+    password_input = st.sidebar.text_input("Contraseña", type="password", key="password_login")
     login_btn = st.sidebar.button("Entrar")
 
     if login_btn:
-        usuarios_df = pd.read_csv(USUARIOS_FILE)
         hash_input = hash_password(password_input)
-        match = usuarios_df[(usuarios_df["usuario"] == usuario_input) & (usuarios_df["password"] == hash_input)]
+        match = usuarios_df[
+            (usuarios_df["usuario"] == usuario_input) &
+            (usuarios_df["password"] == hash_input)
+        ]
         if not match.empty:
-            st.session_state.login = True
+            st.session_state.logueado = True
             st.session_state.usuario = match.iloc[0]["usuario"]
             st.session_state.rol = match.iloc[0]["rol"]
-            st.session_state.nombre = match.iloc[0]["nombre"]
-            st.success(f"Bienvenido {st.session_state.nombre} ({st.session_state.rol})")
+            st.success(f"Bienvenido {st.session_state.usuario} ({st.session_state.rol})")
+            st.rerun()  # 🔥 recarga inmediata con sesión activa
         else:
             st.error("Usuario o contraseña incorrectos.")
-    st.stop()
 else:
-    st.sidebar.write(f"Conectado como: {st.session_state.nombre} ({st.session_state.rol})")
+    st.sidebar.success(f"Conectado como {st.session_state.usuario} ({st.session_state.rol})")
     if st.sidebar.button("Cerrar sesión"):
-        st.session_state.login = False
-        st.experimental_rerun()
+        st.session_state.clear()
+        st.rerun()
 
 # =========================
 # Botón actualizar datos solo maestro
@@ -273,4 +272,5 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
