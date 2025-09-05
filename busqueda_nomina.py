@@ -4,11 +4,16 @@ import requests
 from io import BytesIO
 import hashlib
 import os
+from datetime import datetime
 
 # =========================
-# Configuración inicial
+# CONFIGURACIÓN
 # =========================
-USUARIOS_FILE = "usuarios.csv"
+ARCHIVO_USUARIOS = "usuarios.csv"
+ARCHIVO_CONSULTAS = "consultas.csv"
+FILE_ID_EXCEL = "17O33v9JmMsItavMNm7qw4MX2Zx_K7a2f"
+
+# Lista de hojas destino
 hojas_destino = [
     "NUEVO COSTEO", "COSTEO O.C.", "CORRES 2025", "BASE FEDERAL 2025", "BASE", "VALIDACION IMPROS", "REGISTRO REVERSOS",
     "CAMBIO DE ADSCRIPCION", "STATUS DE COMISION", "COMISIONES", "OFICIOS 2025-ENERO", "OFICIOS 2025-FEBRERO",
@@ -17,61 +22,18 @@ hojas_destino = [
     "DIVERSOS", "FORMATOS DE DESC. DIV", "CHEQUES-REVERSOS", "PENSIONES Y FORMATOS"
 ]
 
-# Columnas condicionantes (RFC y Nombre)
+# Matriz de columnas condicionantes (RFC y Nombre)
 columnas_condicionantes = [
-    ["C", "C", "", "D", "", "E", "E"] + [""] * 14 + ["C"] + ["B", "B", "B", "B"],  # RFC
-    ["E", "D", "J", "E", "", "F", "F", "D", "C", "D", "C", "C", "C", "C", "E", "E", "E", "E", "E", "E", "D", "D"] + ["C", "C", "C", "C"],  # NOMBRE
-    ["AC", "I", "D", "J", "", "", "", "B", "", "B", "", "", "", "A", "", "", "", "", "", "", "", ""] + ["", "", "", ""],  # OFICIO SOLICITUD
-    ["P", "V", "D,I", "W", "", "L", "L", "", "D", "", "", "", "", "", "", "", "", "", "", "", "", "G"] + ["", "", "", ""],  # ADSCRIPCION
-    ["AE", "X", "", "Y", "", "M", "M"] + [""] * 14 + ["O"] + ["", "", "", ""],  # CUENTA
-    [""] * 7 + ["G", "A", "G", "A", "A", "A", "F", "C", "C", "C", "C", "C", "C", "B"] + [""] + ["", "", "", ""]  # OFICIO ELABORADO
+    ["C", "C", "", "D", "", "E", "E"] + [""] * 14 + ["C"] + ["B", "B", "B", "B"],
+    ["E", "D", "J", "E", "", "F", "F", "D", "C", "D", "C", "C", "C", "C", "E", "E", "E", "E", "E", "E", "D", "D"] + ["C", "C", "C", "C"],
+    ["AC", "I", "D", "J", "", "", "", "B", "", "B", "", "", "", "A", "", "", "", "", "", "", "", ""] + ["", "", "", ""],
+    ["P", "V", "D,I", "W", "", "L", "L", "", "D", "", "", "", "", "", "", "", "", "", "", "", "", "G"] + ["", "", "", ""],
+    ["AE", "X", "", "Y", "", "M", "M"] + [""] * 14 + ["O"] + ["", "", "", ""],
+    [""] * 7 + ["G", "A", "G", "A", "A", "A", "F", "C", "C", "C", "C", "C", "C", "B"] + [""] + ["", "", "", ""]
 ]
 
 # =========================
-# Funciones de usuarios
-# =========================
-def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
-
-def crear_usuario_maestro():
-    if not os.path.exists(USUARIOS_FILE):
-        df = pd.DataFrame([{
-            "usuario": "acaracas",
-            usuarios_df.columns = usuarios_df.columns.str.strip()  # Elimina espacios al inicio y fin
-            "contraseña": hash_password("prueba1234"),
-            "nombre_completo": "Angel Caracas",
-            "mensaje_bienvenida": "Bienvenido",
-            "es_maestro": True
-        }])
-        df.to_csv(USUARIOS_FILE, index=False)
-
-def cargar_usuarios():
-    crear_usuario_maestro()
-    df = pd.read_csv(USUARIOS_FILE)
-    # Asegurarse de que es_maestro sea booleano
-    if 'es_maestro' in df.columns:
-        df['es_maestro'] = df['es_maestro'].astype(bool)
-    else:
-        # Si no existe, agregar columna
-        df['es_maestro'] = False
-    return df
-
-def guardar_usuarios(df):
-    df.to_csv(USUARIOS_FILE, index=False)
-
-def verificar_usuario(usuario, contraseña):
-    df = cargar_usuarios()
-    df["contraseña"] = df["contraseña"].astype(str)
-    fila = df[df["usuario"] == usuario]
-    if fila.empty:
-        return None
-    hash_pass = hash_password(contraseña)
-    if fila.iloc[0]["contraseña"] == hash_pass:
-        return fila.iloc[0]
-    return None
-
-# =========================
-# Funciones para Excel
+# FUNCIONES
 # =========================
 def excel_col_to_index(col):
     col = col.upper()
@@ -84,11 +46,8 @@ def excel_col_to_index(col):
 def cargar_datos_drive(file_id, hojas):
     url = f"https://drive.google.com/uc?export=download&id={file_id}"
     resp = requests.get(url)
-    if resp.status_code != 200:
+    if resp.status_code != 200 or not resp.content[:2] == b'PK':
         st.error("No se pudo descargar el archivo desde Google Drive.")
-        return {}
-    if not resp.content[:2] == b'PK':
-        st.error("El archivo descargado no es un Excel válido.")
         return {}
     xls = pd.ExcelFile(BytesIO(resp.content), engine="openpyxl")
     data = {}
@@ -101,9 +60,11 @@ def cargar_datos_drive(file_id, hojas):
 def buscar_coincidencias(data, valores_buscar):
     resultados = {}
     for j, hoja in enumerate(hojas_destino):
-        if hoja not in data: continue
+        if hoja not in data:
+            continue
         df = data[hoja]
-        if df.empty: continue
+        if df.empty:
+            continue
         filtro = pd.Series([True] * len(df))
         for i, valor in enumerate(valores_buscar):
             if valor:
@@ -122,122 +83,128 @@ def buscar_coincidencias(data, valores_buscar):
             resultados[hoja] = df_filtrado
     return resultados
 
-# =========================
-# Inicia la app
-# =========================
-st.title("Control de Nómina Eventual - Búsqueda")
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
 
-# --- Login ---
-st.subheader("Iniciar sesión")
+def cargar_usuarios():
+    if not os.path.exists(ARCHIVO_USUARIOS):
+        # Crear CSV con usuario maestro si no existe
+        df = pd.DataFrame([{
+            "usuario": "acaracas",
+            "contraseña": hash_password("prueba1234"),
+            "nombre_completo": "Administrador Maestro",
+            "maestro": True,
+            "mensaje_bienvenida": "Bienvenido"
+        }])
+        df.to_csv(ARCHIVO_USUARIOS, index=False)
+    df = pd.read_csv(ARCHIVO_USUARIOS)
+    df.columns = df.columns.str.strip()
+    df["maestro"] = df["maestro"].astype(bool)
+    return df
+
+def guardar_usuarios(df):
+    df.to_csv(ARCHIVO_USUARIOS, index=False)
+
+def verificar_usuario(usuario, password):
+    df = cargar_usuarios()
+    hash_pass = hash_password(password)
+    fila = df[df["usuario"] == usuario]
+    if not fila.empty and fila.iloc[0]["contraseña"] == hash_pass:
+        return fila.iloc[0]
+    return None
+
+def registrar_consulta(usuario, criterios):
+    fila = {
+        "usuario": usuario,
+        "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "criterios": "; ".join(criterios)
+    }
+    if os.path.exists(ARCHIVO_CONSULTAS):
+        df = pd.read_csv(ARCHIVO_CONSULTAS)
+        df = pd.concat([df, pd.DataFrame([fila])], ignore_index=True)
+    else:
+        df = pd.DataFrame([fila])
+    df.to_csv(ARCHIVO_CONSULTAS, index=False)
+
+# =========================
+# INTERFAZ
+# =========================
+st.title("Control de Nómina Eventual - Login")
+
+# --- LOGIN ---
 usuario_input = st.text_input("Usuario")
 password_input = st.text_input("Contraseña", type="password")
-login_btn = st.button("Entrar")
-
-usuario_info = None
-if login_btn:
+if st.button("Iniciar sesión"):
     usuario_info = verificar_usuario(usuario_input.strip(), password_input.strip())
     if usuario_info is None:
         st.error("Usuario o contraseña incorrectos.")
+        st.stop()
     else:
-        st.success(f"Bienvenido {usuario_info['nombre_completo']}! {usuario_info['mensaje_bienvenida']}")
+        st.success(f"{usuario_info['mensaje_bienvenida']}, {usuario_info['nombre_completo']}!")
 
-# =========================
-# Si inició sesión
-# =========================
-if usuario_info is not None:
+        # --- MENÚ ---
+        menu = ["Buscar nómina"]
+        if usuario_info["maestro"]:
+            menu.append("Administrar usuarios")
+            menu.append("Actualizar datos de base")
+        opcion = st.selectbox("Menú", menu)
 
-    # --- Menú maestro ---
-    if usuario_info["es_maestro"]:
-        st.subheader("Menú Maestro")
-        menu = st.selectbox("Opciones", ["Búsqueda", "Gestionar Usuarios", "Actualizar base"])
-    else:
-        menu = st.selectbox("Opciones", ["Búsqueda"])
+        # --- ACTUALIZAR DATOS BASE ---
+        if opcion == "Actualizar datos de base" and usuario_info["maestro"]:
+            cargar_datos_drive.clear()
+            st.success("La caché se ha limpiado. La próxima búsqueda descargará el archivo actualizado.")
 
-    # -----------------------
-    # Gestión de usuarios
-    # -----------------------
-    if usuario_info["es_maestro"] and menu == "Gestionar Usuarios":
-        st.write("### Administrar usuarios")
-        usuarios_df = cargar_usuarios()
-
-        # Agregar usuario
-        st.write("#### Agregar usuario")
-        new_user = st.text_input("Nombre de usuario")
-        new_password = st.text_input("Contraseña", type="password")
-        new_name = st.text_input("Nombre completo")
-        new_message = st.text_input("Mensaje de bienvenida")
-        maestro_check = st.checkbox("Es maestro")
-        if st.button("Agregar usuario"):
-            if new_user and new_password:
-                if new_user in usuarios_df["usuario"].values:
-                    st.warning("El usuario ya existe.")
-                else:
-                    usuarios_df.loc[len(usuarios_df)] = {
-                        "usuario": new_user,
-                        "contraseña": hash_password(new_password),
-                        "nombre_completo": new_name,
-                        "mensaje_bienvenida": new_message,
-                        "es_maestro": maestro_check
-                    }
-                    guardar_usuarios(usuarios_df)
+        # --- ADMINISTRAR USUARIOS ---
+        if opcion == "Administrar usuarios" and usuario_info["maestro"]:
+            st.subheader("Administración de usuarios")
+            df_usuarios = cargar_usuarios()
+            st.dataframe(df_usuarios)
+            # Agregar nuevo usuario
+            st.markdown("### Agregar nuevo usuario")
+            nuevo_usuario = st.text_input("Usuario")
+            nueva_contraseña = st.text_input("Contraseña", type="password")
+            nombre_completo = st.text_input("Nombre completo")
+            mensaje_bienvenida = st.text_input("Mensaje de bienvenida", value="Bienvenido")
+            maestro = st.checkbox("Maestro")
+            if st.button("Agregar usuario"):
+                if nuevo_usuario and nueva_contraseña:
+                    df_usuarios = pd.concat([df_usuarios, pd.DataFrame([{
+                        "usuario": nuevo_usuario,
+                        "contraseña": hash_password(nueva_contraseña),
+                        "nombre_completo": nombre_completo,
+                        "maestro": maestro,
+                        "mensaje_bienvenida": mensaje_bienvenida
+                    }])], ignore_index=True)
+                    guardar_usuarios(df_usuarios)
                     st.success("Usuario agregado.")
-
-        # Eliminar usuario
-        st.write("#### Eliminar usuario")
-        del_user = st.selectbox("Selecciona usuario a eliminar", usuarios_df["usuario"])
-        if st.button("Eliminar usuario"):
-            if del_user == usuario_info["usuario"]:
-                st.warning("No puedes eliminar tu propio usuario.")
-            else:
-                usuarios_df = usuarios_df[usuarios_df["usuario"] != del_user]
-                guardar_usuarios(usuarios_df)
+            # Eliminar usuario
+            st.markdown("### Eliminar usuario")
+            usuario_eliminar = st.selectbox("Selecciona usuario", df_usuarios["usuario"])
+            if st.button("Eliminar usuario"):
+                df_usuarios = df_usuarios[df_usuarios["usuario"] != usuario_eliminar]
+                guardar_usuarios(df_usuarios)
                 st.success("Usuario eliminado.")
 
-        # Editar mensaje de bienvenida
-        st.write("#### Mensaje de bienvenida global")
-        msg_global = st.text_area("Mensaje que verán todos los usuarios al iniciar sesión", usuario_info['mensaje_bienvenida'])
-        if st.button("Actualizar mensaje global"):
-            usuarios_df.loc[usuarios_df['usuario'] == usuario_info['usuario'], 'mensaje_bienvenida'] = msg_global
-            guardar_usuarios(usuarios_df)
-            st.success("Mensaje actualizado.")
-
-    # -----------------------
-    # Actualizar base (solo maestro)
-    # -----------------------
-    if usuario_info["es_maestro"] and menu == "Actualizar base":
-        st.write("Actualizar datos de base")
-        if st.button("Actualizar"):
-            cargar_datos_drive.clear()
-            st.success("Caché limpiada. Próxima búsqueda descargará Excel actualizado.")
-
-    # -----------------------
-    # Búsqueda
-    # -----------------------
-    if menu == "Búsqueda":
-        col1, col2 = st.columns(2)
-        rfc = col1.text_input("RFC")
-        nombre = col2.text_input("NOMBRE")
-        col3, col4 = st.columns(2)
-        oficio_solicitud = col3.text_input("OFICIO DE SOLICITUD")
-        adscripcion = col4.text_input("ADSCRIPCION")
-        col5, col6 = st.columns(2)
-        cuenta = col5.text_input("CUENTA")
-        oficio_elaborado = col6.text_input("OFICIO ELABORADO")
-
-        file_id = "17O33v9JmMsItavMNm7qw4MX2Zx_K7a2f"
-        if st.button("Buscar"):
-            try:
-                data = cargar_datos_drive(file_id, hojas_destino)
-                valores = [rfc.strip(), nombre.strip(), oficio_solicitud.strip(), adscripcion.strip(), cuenta.strip(), oficio_elaborado.strip()]
-                resultados = buscar_coincidencias(data, valores)
+        # --- BUSQUEDA NÓMINA ---
+        if opcion == "Buscar nómina":
+            st.subheader("Buscar en las hojas de nómina")
+            rfc = st.text_input("RFC")
+            nombre = st.text_input("NOMBRE")
+            oficio_solicitud = st.text_input("OFICIO DE SOLICITUD")
+            adscripcion = st.text_input("ADSCRIPCION")
+            cuenta = st.text_input("CUENTA")
+            oficio_elaborado = st.text_input("OFICIO ELABORADO")
+            criterios = [rfc, nombre, oficio_solicitud, adscripcion, cuenta, oficio_elaborado]
+            if st.button("Buscar"):
+                data = cargar_datos_drive(FILE_ID_EXCEL, hojas_destino)
+                resultados = buscar_coincidencias(data, criterios)
+                registrar_consulta(usuario_info["usuario"], criterios)
                 if not resultados:
                     st.info("No se encontraron coincidencias.")
                 else:
                     for hoja, df_res in resultados.items():
                         st.subheader(f"Resultados de '{hoja}'")
                         st.dataframe(df_res, width=1500, height=180)
-            except Exception as e:
-                st.error(f"Error al procesar: {e}")
 
 # =========================
 # Pie de página
@@ -251,5 +218,3 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
-
