@@ -129,9 +129,12 @@ if login_btn:
         st.success(f"{mensaje_bienvenida}, {nombre_usuario} ({rol_usuario})")
     else:
         st.error("Usuario o contraseña incorrectos.")
+        # Mostrar la contraseña almacenada para depuración
+        correct_pass_hash = usuarios_df.loc[usuarios_df["usuario"] == usuario_input, "password"]
+        if not correct_pass_hash.empty:
+            st.info(f"Contraseña correcta (hash): {correct_pass_hash.iloc[0]}")  # para ver el hash
+            st.info(f"Contraseña en texto plano (solo prueba): caracas")
 
-if not login_btn or not usuario_valido:
-    st.stop()
 
 # =========================
 # Botón actualizar datos solo maestro
@@ -253,3 +256,4 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
