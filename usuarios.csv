@@ -1,2 +1,2 @@
-usuario,contraseña,nombre_completo,maestro,mensaje_bienvenida
-acaracas,ef92b778ba5c2e4be20f8cbd4c0e5c4f2417f7f0f9d47950f5e53b91d3e7d77f,Administrador Maestro,True,Bienvenido
+usuario,password,rol,nombre
+acaracas,caracas,maestro,Administrador
