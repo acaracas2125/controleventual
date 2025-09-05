@@ -10,43 +10,13 @@ import hashlib
 # =========================
 USUARIOS_FILE = "usuarios.csv"
 CONSULTAS_FILE = "consultas.csv"
+MENSAJE_FILE = "mensaje_bienvenida.txt"
 
 # =========================
 # Funciones
 # =========================
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
-
-# =========================
-# Crear o corregir usuario maestro
-# =========================
-df_maestro = pd.DataFrame([{
-    "usuario": "acaracas",
-    "password": hash_password("caracas"),
-    "rol": "maestro",
-    "nombre": "Administrador"
-}])
-
-if not os.path.exists(USUARIOS_FILE):
-    df_maestro.to_csv(USUARIOS_FILE, index=False)
-else:
-    usuarios_df = pd.read_csv(USUARIOS_FILE)
-    if "acaracas" not in usuarios_df["usuario"].values:
-        usuarios_df = pd.concat([usuarios_df, df_maestro], ignore_index=True)
-    else:
-        usuarios_df.loc[usuarios_df["usuario"] == "acaracas", ["password", "rol", "nombre"]] = df_maestro.loc[0, ["password", "rol", "nombre"]].values
-    usuarios_df.to_csv(USUARIOS_FILE, index=False)
-
-# =========================
-# Excel
-# =========================
-hojas_destino = [
-    "NUEVO COSTEO", "COSTEO O.C.", "CORRES 2025", "BASE FEDERAL 2025", "BASE", "VALIDACION IMPROS", "REGISTRO REVERSOS",
-    "CAMBIO DE ADSCRIPCION", "STATUS DE COMISION", "COMISIONES", "OFICIOS 2025-ENERO", "OFICIOS 2025-FEBRERO",
-    "OFICIOS 2025-MARZO", "OFICIO 2025-JUNIO", "LIC. MARCELA.", "CONTRATOS", "MEMOS", "MTRA. NOELIA",
-    "STATUS DE OFI. DEPÁCHADOS OLI", "COMISIONES (2)", "Hoja1 (5)", "NOMINA ACTUAL",
-    "DIVERSOS", "FORMATOS DE DESC. DIV", "CHEQUES-REVERSOS", "PENSIONES Y FORMATOS"
-]
 
 def excel_col_to_index(col):
     col = col.upper()
@@ -69,85 +39,7 @@ def cargar_datos_drive(file_id, hojas):
             data[hoja] = pd.read_excel(xls, sheet_name=hoja, engine="openpyxl")
     return data
 
-# =========================
-# Interfaz Streamlit
-# =========================
-st.title("Control de Nómina Eventual - Búsqueda")
-
-# Login
-st.sidebar.title("🔑 Iniciar sesión")
-usuario_input = st.sidebar.text_input("Usuario")
-password_input = st.sidebar.text_input("Contraseña", type="password")
-login_btn = st.sidebar.button("Entrar")
-
-usuarios_df = pd.read_csv(USUARIOS_FILE)
-usuario_valido = False
-rol_usuario = None
-nombre_usuario = None
-
-if login_btn:
-    hash_input = hash_password(password_input)
-    match = usuarios_df[(usuarios_df["usuario"] == usuario_input) & (usuarios_df["password"] == hash_input)]
-    if not match.empty:
-        usuario_valido = True
-        rol_usuario = match.iloc[0]["rol"]
-        nombre_usuario = match.iloc[0]["nombre"]
-        st.success(f"Bienvenido {nombre_usuario} ({rol_usuario})")
-    else:
-        st.error("Usuario o contraseña incorrectos.")
-        st.info("Por esta ocasión, la contraseña correcta del usuario maestro es: caracas")
-
-if not login_btn or not usuario_valido:
-    st.stop()
-
-# Aquí continuarías con los campos de búsqueda y todo lo demás...
-
-# =========================
-# Funciones de Excel
-# =========================
-hojas_destino = [
-    "NUEVO COSTEO", "COSTEO O.C.", "CORRES 2025", "BASE FEDERAL 2025", "BASE", "VALIDACION IMPROS", "REGISTRO REVERSOS",
-    "CAMBIO DE ADSCRIPCION", "STATUS DE COMISION", "COMISIONES", "OFICIOS 2025-ENERO", "OFICIOS 2025-FEBRERO",
-    "OFICIOS 2025-MARZO", "OFICIO 2025-JUNIO", "LIC. MARCELA.", "CONTRATOS", "MEMOS", "MTRA. NOELIA",
-    "STATUS DE OFI. DEPÁCHADOS OLI", "COMISIONES (2)", "Hoja1 (5)", "NOMINA ACTUAL",
-    "DIVERSOS", "FORMATOS DE DESC. DIV", "CHEQUES-REVERSOS", "PENSIONES Y FORMATOS"
-]
-
-columnas_condicionantes = [
-    ["C", "C", "", "D", "", "E", "E"] + [""] * 14 + ["C"] + ["B", "B", "B", "B"],
-    ["E", "D", "J", "E", "", "F", "F", "D", "C", "D", "C", "C", "C", "C", "E", "E", "E", "E", "E", "E", "D", "D"] + ["C", "C", "C", "C"],
-    ["AC", "I", "D", "J", "", "", "", "B", "", "B", "", "", "", "A", "", "", "", "", "", "", "", ""] + ["", "", "", ""],
-    ["P", "V", "D,I", "W", "", "L", "L", "", "D", "", "", "", "", "", "", "", "", "", "", "", "", "G"] + ["", "", "", ""],
-    ["AE", "X", "", "Y", "", "M", "M"] + [""] * 14 + ["O"] + ["", "", "", ""],
-    [""] * 7 + ["G", "A", "G", "A", "A", "A", "F", "C", "C", "C", "C", "C", "C", "B"] + [""] + ["", "", "", ""]
-]
-
-def excel_col_to_index(col):
-    col = col.upper()
-    index = 0
-    for char in col:
-        index = index * 26 + (ord(char) - ord('A') + 1)
-    return index - 1
-
-@st.cache_data(show_spinner="Descargando y procesando Excel desde Google Drive...")
-def cargar_datos_drive(file_id, hojas):
-    url = f"https://drive.google.com/uc?export=download&id={file_id}"
-    resp = requests.get(url)
-    if resp.status_code != 200:
-        st.error("No se pudo descargar el archivo desde Google Drive. Verifica permisos o el ID.")
-        return {}
-    if not resp.content[:2] == b'PK':
-        st.error("El archivo descargado no es un Excel válido. Verifica el ID o permisos.")
-        return {}
-    xls = pd.ExcelFile(BytesIO(resp.content), engine="openpyxl")
-    data = {}
-    for hoja in hojas:
-        if hoja in xls.sheet_names:
-            df = pd.read_excel(xls, sheet_name=hoja, engine="openpyxl")
-            data[hoja] = df
-    return data
-
-def buscar_coincidencias(data, valores_buscar):
+def buscar_coincidencias(data, valores_buscar, hojas_destino, columnas_condicionantes):
     resultados = {}
     for j, hoja in enumerate(hojas_destino):
         if hoja not in data:
@@ -174,17 +66,57 @@ def buscar_coincidencias(data, valores_buscar):
     return resultados
 
 # =========================
+# Crear usuario maestro si no existe
+# =========================
+df_maestro = pd.DataFrame([{
+    "usuario": "acaracas",
+    "password": hash_password("caracas"),
+    "rol": "maestro",
+    "nombre": "Administrador"
+}])
+
+if not os.path.exists(USUARIOS_FILE):
+    df_maestro.to_csv(USUARIOS_FILE, index=False)
+else:
+    usuarios_df = pd.read_csv(USUARIOS_FILE)
+    if "acaracas" not in usuarios_df["usuario"].values:
+        usuarios_df = pd.concat([usuarios_df, df_maestro], ignore_index=True)
+    else:
+        usuarios_df.loc[usuarios_df["usuario"] == "acaracas", ["password", "rol", "nombre"]] = df_maestro.loc[0, ["password", "rol", "nombre"]].values
+    usuarios_df.to_csv(USUARIOS_FILE, index=False)
+
+# =========================
+# Configuración de Excel
+# =========================
+hojas_destino = [
+    "NUEVO COSTEO", "COSTEO O.C.", "CORRES 2025", "BASE FEDERAL 2025", "BASE", "VALIDACION IMPROS", "REGISTRO REVERSOS",
+    "CAMBIO DE ADSCRIPCION", "STATUS DE COMISION", "COMISIONES", "OFICIOS 2025-ENERO", "OFICIOS 2025-FEBRERO",
+    "OFICIOS 2025-MARZO", "OFICIO 2025-JUNIO", "LIC. MARCELA.", "CONTRATOS", "MEMOS", "MTRA. NOELIA",
+    "STATUS DE OFI. DEPÁCHADOS OLI", "COMISIONES (2)", "Hoja1 (5)", "NOMINA ACTUAL",
+    "DIVERSOS", "FORMATOS DE DESC. DIV", "CHEQUES-REVERSOS", "PENSIONES Y FORMATOS"
+]
+
+columnas_condicionantes = [
+    ["C", "C", "", "D", "", "E", "E"] + [""] * 14 + ["C"] + ["B", "B", "B", "B"],
+    ["E", "D", "J", "E", "", "F", "F", "D", "C", "D", "C", "C", "C", "C", "E", "E", "E", "E", "E", "E", "D", "D"] + ["C", "C", "C", "C"],
+    ["AC", "I", "D", "J", "", "", "", "B", "", "B", "", "", "", "A", "", "", "", "", "", "", "", ""] + ["", "", "", ""],
+    ["P", "V", "D,I", "W", "", "L", "L", "", "D", "", "", "", "", "", "", "", "", "", "", "", "", "G"] + ["", "", "", ""],
+    ["AE", "X", "", "Y", "", "M", "M"] + [""] * 14 + ["O"] + ["", "", "", ""],
+    [""] * 7 + ["G", "A", "G", "A", "A", "A", "F", "C", "C", "C", "C", "C", "C", "B"] + [""] + ["", "", "", ""]
+]
+
+# =========================
 # Interfaz Streamlit
 # =========================
 st.title("Control de Nómina Eventual - Búsqueda")
 
 # =========================
-# Login
+# Login (único bloque)
 # =========================
 st.sidebar.title("🔑 Iniciar sesión")
-usuario_input = st.sidebar.text_input("Usuario")
-password_input = st.sidebar.text_input("Contraseña", type="password")
-login_btn = st.sidebar.button("Entrar")
+usuario_input = st.sidebar.text_input("Usuario", key="login_usuario")
+password_input = st.sidebar.text_input("Contraseña", type="password", key="login_password")
+login_btn = st.sidebar.button("Entrar", key="login_btn")
 
 usuarios_df = pd.read_csv(USUARIOS_FILE)
 usuario_valido = False
@@ -207,12 +139,10 @@ if login_btn:
         st.success(f"{mensaje_bienvenida}, {nombre_usuario} ({rol_usuario})")
     else:
         st.error("Usuario o contraseña incorrectos.")
-        # Mostrar la contraseña almacenada para depuración
-        correct_pass_hash = usuarios_df.loc[usuarios_df["usuario"] == usuario_input, "password"]
-        if not correct_pass_hash.empty:
-            st.info(f"Contraseña correcta (hash): {correct_pass_hash.iloc[0]}")  # para ver el hash
-            st.info(f"Contraseña en texto plano (solo prueba): caracas")
+        st.info("Por esta ocasión, la contraseña correcta del usuario maestro es: caracas")
 
+if not login_btn or not usuario_valido:
+    st.stop()
 
 # =========================
 # Botón actualizar datos solo maestro
@@ -266,6 +196,11 @@ if rol_usuario == "maestro":
             st.sidebar.success("Usuario actualizado")
 
     elif menu_admin == "Editar mensaje bienvenida":
+        if os.path.exists(MENSAJE_FILE):
+            with open(MENSAJE_FILE, "r", encoding="utf-8") as f:
+                mensaje_bienvenida = f.read()
+        else:
+            mensaje_bienvenida = "Bienvenido"
         nuevo_mensaje = st.sidebar.text_input("Mensaje de bienvenida", value=mensaje_bienvenida)
         if st.sidebar.button("Guardar mensaje"):
             with open(MENSAJE_FILE, "w", encoding="utf-8") as f:
@@ -292,7 +227,7 @@ if st.button("Buscar"):
     try:
         data = cargar_datos_drive(file_id, hojas_destino)
         valores = [rfc.strip(), nombre.strip(), oficio_solicitud.strip(), adscripcion.strip(), cuenta.strip(), oficio_elaborado.strip()]
-        resultados = buscar_coincidencias(data, valores)
+        resultados = buscar_coincidencias(data, valores, hojas_destino, columnas_condicionantes)
 
         # Guardar consultas
         consulta = {
@@ -334,5 +269,3 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
-
