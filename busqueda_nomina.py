@@ -19,25 +19,43 @@ def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 # =========================
-# Crear o corregir usuario maestro
+# Crear o corregir usuarios por defecto
 # =========================
-df_maestro = pd.DataFrame([{
-    "usuario": "acaracas",
-    "password": hash_password("caracas"),
-    "rol": "maestro",
-    "nombre": "Administrador"
-}])
+usuarios_default = pd.DataFrame([
+    {
+        "usuario": "acaracas",
+        "password": hash_password("caracas"),
+        "rol": "maestro",
+        "nombre": "Administrador"
+    },
+    {
+        "usuario": "lhernandez",
+        "password": hash_password("lau"),
+        "rol": "usuario",
+        "nombre": "Luis Hernández"
+    },
+    {
+        "usuario": "omperez",
+        "password": hash_password("ositis"),
+        "rol": "usuario",
+        "nombre": "Omar Pérez"
+    }
+])
 
 if not os.path.exists(USUARIOS_FILE):
-    df_maestro.to_csv(USUARIOS_FILE, index=False)
+    usuarios_default.to_csv(USUARIOS_FILE, index=False)
 else:
     usuarios_df = pd.read_csv(USUARIOS_FILE)
-    if "acaracas" not in usuarios_df["usuario"].values:
-        usuarios_df = pd.concat([usuarios_df, df_maestro], ignore_index=True)
-    else:
-        usuarios_df.loc[usuarios_df["usuario"] == "acaracas", ["password", "rol", "nombre"]] = \
-            df_maestro.loc[0, ["password", "rol", "nombre"]].values
+    for _, row in usuarios_default.iterrows():
+        if row["usuario"] not in usuarios_df["usuario"].values:
+            # Si no existe, lo agregamos
+            usuarios_df = pd.concat([usuarios_df, pd.DataFrame([row])], ignore_index=True)
+        else:
+            # Si existe, actualizamos datos (password, rol, nombre)
+            usuarios_df.loc[usuarios_df["usuario"] == row["usuario"], ["password", "rol", "nombre"]] = \
+                row[["password", "rol", "nombre"]].values
     usuarios_df.to_csv(USUARIOS_FILE, index=False)
+
 
 # =========================
 # Excel
@@ -258,3 +276,4 @@ else:
         """,
         unsafe_allow_html=True
     )
+
