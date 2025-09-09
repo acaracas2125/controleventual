@@ -11,6 +11,7 @@ import hashlib
 USUARIOS_FILE = "usuarios.csv"
 CONSULTAS_FILE = "consultas.csv"
 MENSAJE_FILE = "mensaje.txt"
+EXCEL_CACHE_FILE = "datos_cache.xlsx"  # cache local del Excel
 
 # =========================
 # Funciones
@@ -48,14 +49,11 @@ else:
     usuarios_df = pd.read_csv(USUARIOS_FILE)
     for _, row in usuarios_default.iterrows():
         if row["usuario"] not in usuarios_df["usuario"].values:
-            # Si no existe, lo agregamos
             usuarios_df = pd.concat([usuarios_df, pd.DataFrame([row])], ignore_index=True)
         else:
-            # Si existe, actualizamos datos (password, rol, nombre)
             usuarios_df.loc[usuarios_df["usuario"] == row["usuario"], ["password", "rol", "nombre"]] = \
                 row[["password", "rol", "nombre"]].values
     usuarios_df.to_csv(USUARIOS_FILE, index=False)
-
 
 # =========================
 # Excel
@@ -77,14 +75,24 @@ def excel_col_to_index(col):
         index = index * 26 + (ord(char) - ord('A') + 1)
     return index - 1
 
-@st.cache_data(show_spinner="Descargando y procesando Excel desde Google Drive...")
+@st.cache_data(show_spinner="Cargando Excel (desde cache local o Google Drive)...")
 def cargar_datos_drive(file_id, hojas):
-    url = f"https://drive.google.com/uc?export=download&id={file_id}"
-    resp = requests.get(url)
-    if resp.status_code != 200 or not resp.content[:2] == b'PK':
-        st.error("No se pudo descargar el archivo o no es Excel válido.")
-        return {}
-    xls = pd.ExcelFile(BytesIO(resp.content), engine="openpyxl")
+    # Si ya existe cache local, usarlo
+    if os.path.exists(EXCEL_CACHE_FILE):
+        xls = pd.ExcelFile(EXCEL_CACHE_FILE, engine="openpyxl")
+    else:
+        # Descargar de Google Drive
+        url = f"https://drive.google.com/uc?export=download&id={file_id}"
+        resp = requests.get(url)
+        if resp.status_code != 200 or not resp.content[:2] == b'PK':
+            st.error("No se pudo descargar el archivo o no es Excel válido.")
+            return {}
+        # Guardar archivo en cache local
+        with open(EXCEL_CACHE_FILE, "wb") as f:
+            f.write(resp.content)
+        xls = pd.ExcelFile(BytesIO(resp.content), engine="openpyxl")
+
+    # Leer hojas solicitadas
     data = {}
     for hoja in hojas:
         if hoja in xls.sheet_names:
@@ -216,13 +224,15 @@ else:
     # Botón actualizar datos solo para maestro
     if st.session_state.rol == "maestro":
         if st.button("Actualizar datos de base"):
-            cargar_datos_drive.clear()
-            st.success("Caché limpiada. La próxima búsqueda descargará el archivo actualizado.")
+            if os.path.exists(EXCEL_CACHE_FILE):
+                os.remove(EXCEL_CACHE_FILE)   # borra cache local
+            cargar_datos_drive.clear()        # borra cache de streamlit
+            st.success("Caché borrado. La próxima búsqueda descargará el archivo actualizado desde Drive.")
 
     # Inputs de búsqueda
     col1, col2 = st.columns(2)
     rfc = col1.text_input("RFC", key="rfc")
-    nombre = col2.text_input("NOMBRE", key="nombre_busqueda")  # clave distinta para no chocar con usuario
+    nombre = col2.text_input("NOMBRE", key="nombre_busqueda")
     col3, col4 = st.columns(2)
     oficio_solicitud = col3.text_input("OFICIO DE SOLICITUD", key="oficio_solicitud")
     adscripcion = col4.text_input("ADSCRIPCION", key="adscripcion")
@@ -239,10 +249,7 @@ else:
             resultados = buscar_coincidencias(data, valores)
 
             # Guardar consultas
-            consulta = {
-                "usuario": st.session_state.usuario,
-                "criterios": str(valores)
-            }
+            consulta = {"usuario": st.session_state.usuario, "criterios": str(valores)}
             if os.path.exists(CONSULTAS_FILE):
                 consultas_df = pd.read_csv(CONSULTAS_FILE)
                 nuevo_df = pd.DataFrame([consulta])
@@ -276,4 +283,3 @@ else:
         """,
         unsafe_allow_html=True
     )
-
