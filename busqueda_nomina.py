@@ -14,9 +14,9 @@ CONSULTAS_FILE = "consultas.csv"
 MENSAJE_FILE = "mensaje.txt"
 
 # Pendientes: coloca aquí los links de Drive de cada archivo Excel
-DRIVE_CONTROL = "15H3ULUuPxBNo_nBHIjUdCiB1EK_ngAvZ"
-DRIVE_HISTORICO = "1sg_YeF-k9M6bv3GMpwzbNRIBWf0nf_S3"
-DRIVE_CONSOLIDAR = "14xoBudN1KeCnNAm2yHiUYDLwFeBh0yA"
+DRIVE_CONTROL = "https://docs.google.com/spreadsheets/d/15H3ULUuPxBNo_nBHIjUdCiB1EK_ngAvZ/edit?usp=drive_link&ouid=109199175635163763551&rtpof=true&sd=true"
+DRIVE_HISTORICO = "https://docs.google.com/spreadsheets/d/1sg_YeF-k9M6bv3GMpwzbNRIBWf0nf_S3/edit?usp=drive_link&ouid=109199175635163763551&rtpof=true&sd=true"
+DRIVE_CONSOLIDAR = "https://docs.google.com/spreadsheets/d/14xoBudN1KeCnNAm2yHiUYDLwFeBh0yA-/edit?usp=drive_link&ouid=109199175635163763551&rtpof=true&sd=true"
 
 # =========================
 # Funciones de utilidad
@@ -327,5 +327,6 @@ st.markdown("""
         © Derechos Reservados. Angel Caracas.
     </div>
 """, unsafe_allow_html=True)
+
 
 
