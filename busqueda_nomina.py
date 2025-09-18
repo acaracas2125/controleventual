@@ -11,7 +11,7 @@ import socket
 usuarios_defecto = pd.DataFrame([
     {"usuario":"acaracas","pasword":"cccc","nombre_completo":"Angel Caracas","maestro":True,"mensaje":"Bienvenido master"},
     {"usuario":"lhernandez","pasword":"lau","nombre_completo":"Laura Hernández Rivera","maestro":True,"mensaje":"Bienvenida Lau"},
-    {"usuario":"adrian","pasword":"adrian","nombre_completo":"Adrian","maestro":True,"mensaje":"Bienvenido"},	
+    {"usuario":"adrian","pasword":"adrian","nombre_completo":"Adrian","maestro":True,"mensaje":"Bienvenido"},    
     {"usuario":"omperez","pasword":"ositis","nombre_completo":"Osiris Monserrat Pérez nieto","maestro":True,"mensaje":"Bienvenida Ositis"},
     {"usuario":"miros","pasword":"tiamo","nombre_completo":"Miroslava Jimenez Candia","maestro":True,"mensaje":"Bienvenida hermosa =)   10!"}
 ])
@@ -58,7 +58,7 @@ else:
 # =========================
 # Configuración de página y estilos
 # =========================
-st.set_page_config(page_title="Control de Nómina (V 2.0.1)📝", page_icon="💡")
+st.set_page_config(page_title="Control de Nómina (V 2.0.0)📝", page_icon="💡")
 st.markdown("""
 <style>
 body {background-color: #2F2F2F;}
@@ -99,7 +99,7 @@ for key in ["data_excel","data_historico","data_consolidar","resultados","indice
         st.session_state[key] = None if key != "indice_nomina" else 0
 
 # =========================
-# HOJAS Y ENLACES DE GOOGLE SHEETS
+# Rutas y hojas
 # =========================
 hojas_destino = [
     "NUEVO COSTEO", "COSTEO O.C.", "CORRES 2025", "BASE FEDERAL 2025", "BASE",
@@ -110,47 +110,53 @@ hojas_destino = [
     "Hoja1 (5)", "NOMINA ACTUAL", "DIVERSOS", "FORMATOS DE DESC. DIV",
     "CHEQUES-REVERSOS", "PENSIONES Y FORMATOS"
 ]
+hoja_historico = ["trabajando"]
+mapa_historico = {"RFC":"D","NOMBRE":"E","ADSCRIPCION":"V"}
 
-# IDs de los Google Sheets
-drive_ids = {
-    "control_nomina": "15H3ULUuPxBNo_nBHIjUdCiB1EK_ngAvZ",
-    "historico": "1sg_YeF-k9M6bv3GMpwzbNRIBWf0nf_S3",
-    "consolidar": "14xoBudN1KeCnNAm2yHiUYDLwFeBh0yA-"
-}
+# =========================
+# IDs de Google Drive (poner los correctos)
+# =========================
+FILE_ID_EXCEL_CONTROL = "PUT_YOUR_ID_HERE"
+FILE_ID_EXCEL_HISTORICO = "PUT_YOUR_ID_HERE"
+FILE_ID_EXCEL_CONSOLIDAR = "PUT_YOUR_ID_HERE"
 
+# =========================
+# Funciones de descarga y carga de Excel
+# =========================
+@st.cache_data(show_spinner="Descargando archivos desde Drive...")
 def descargar_excel_drive(file_id):
-    """Descarga un Google Sheet como Excel (.xlsx) en memoria"""
-    url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
-    resp = requests.get(url)
-    if resp.status_code != 200:
-        st.error(f"No se pudo descargar el archivo (HTTP {resp.status_code})")
-        return None
     try:
-        xls = pd.ExcelFile(BytesIO(resp.content), engine="openpyxl")
-        return xls
+        url = f"https://drive.google.com/uc?export=download&id={file_id}"
+        resp = requests.get(url)
+        if resp.status_code != 200 or not resp.content[:2] == b'PK':
+            st.warning(f"No se pudo descargar el archivo (HTTP {resp.status_code})")
+            return None
+        return BytesIO(resp.content)
     except Exception as e:
-        st.error(f"Error al leer Excel: {e}")
+        st.error(f"Error al descargar Excel: {e}")
         return None
 
-def cargar_hojas(xls, hojas):
-    """Carga solo las hojas solicitadas de un ExcelFile en memoria"""
+@st.cache_data(show_spinner="Cargando hojas de Excel...")
+def cargar_hojas(xls_bytesio, hojas):
+    if not xls_bytesio:
+        return {}
+    xls = pd.ExcelFile(xls_bytesio, engine="openpyxl")
     data = {}
-    if not xls: return data
     for hoja in hojas:
         if hoja in xls.sheet_names:
             data[hoja] = pd.read_excel(xls, sheet_name=hoja, engine="openpyxl")
     return data
 
 # =========================
-# Botón cargar archivos
+# Cargar archivos
 # =========================
 if st.button("📂 Cargar archivos desde Drive") or st.session_state["data_excel"] is None:
-    xls_control = descargar_excel_drive(drive_ids["control_nomina"])
-    xls_historico = descargar_excel_drive(drive_ids["historico"])
-    xls_consolidar = descargar_excel_drive(drive_ids["consolidar"])
+    xls_control = descargar_excel_drive(FILE_ID_EXCEL_CONTROL)
+    xls_historico = descargar_excel_drive(FILE_ID_EXCEL_HISTORICO)
+    xls_consolidar = descargar_excel_drive(FILE_ID_EXCEL_CONSOLIDAR)
 
     st.session_state["data_excel"] = cargar_hojas(xls_control, hojas_destino)
-    st.session_state["data_historico"] = cargar_hojas(xls_historico, ["trabajando"])
+    st.session_state["data_historico"] = cargar_hojas(xls_historico, hoja_historico)
     st.session_state["data_consolidar"] = cargar_hojas(xls_consolidar, ["PLANTILLA"])
 
     st.success("Archivos cargados correctamente en memoria.")
@@ -158,7 +164,7 @@ if st.button("📂 Cargar archivos desde Drive") or st.session_state["data_excel
 # =========================
 # Inputs de búsqueda
 # =========================
-st.title("Control de Nómina (V 2.0.1)")
+st.title("Control de Nómina (V 2.0.0)")
 
 col1,col2 = st.columns(2)
 rfc = col1.text_input("RFC")
@@ -183,25 +189,37 @@ if limpiar:
     st.session_state["indice_nomina"] = 0
 
 # =========================
-# Función de búsqueda
+# Función de búsqueda unificada
 # =========================
+def letra_a_indice(letra):
+    letra = letra.upper()
+    idx = 0
+    for c in letra:
+        idx = idx*26 + (ord(c)-ord('A')+1)
+    return idx-1
+
 def buscar_datos(data_dict, valores, asunto="", tipo="CONTROL"):
     res = {}
     for hoja, df in data_dict.items():
         if df.empty: continue
         filtro = pd.Series([True]*len(df))
-
         for campo, val in valores.items():
             if val:
-                cond = df.astype(str).apply(lambda c: c.str.upper().str.contains(val.upper(), na=False))
-                filtro &= cond.any(axis=1)
-
+                if tipo=="HISTORICO":
+                    if campo in mapa_historico:
+                        idx = letra_a_indice(mapa_historico[campo])
+                        filtro &= df.iloc[:,idx].astype(str).str.upper().str.contains(val.upper(), na=False)
+                elif tipo=="CONSOLIDAR":
+                    col = campo if campo in df.columns else None
+                    if col: filtro &= df[col].astype(str).str.upper().str.contains(val.upper(), na=False)
+                else:
+                    filtro &= df.astype(str).apply(lambda c: c.str.upper().str.contains(val.upper(), na=False)).any(axis=1)
         if asunto and "ASUNTO" in df.columns:
             filtro &= df["ASUNTO"].astype(str).str.upper().str.contains(asunto.upper(), na=False)
-
         df_filtrado = df[filtro]
         if not df_filtrado.empty:
-            res[hoja] = df_filtrado
+            prefijo = "" if tipo=="CONTROL" else f"{tipo} - "
+            res[f"{prefijo}{hoja}"] = df_filtrado
     return res
 
 # =========================
@@ -219,33 +237,26 @@ if buscar:
             "OFICIO ELABORADO": oficio_elaborado.strip()
         }
         asunto_val = col7.strip()
-
         res_control = buscar_datos(st.session_state["data_excel"], valores_dict, asunto_val, tipo="CONTROL")
         res_hist = buscar_datos(st.session_state["data_historico"], valores_dict, asunto_val, tipo="HISTORICO")
         res_consol = buscar_datos(st.session_state["data_consolidar"], valores_dict, asunto_val, tipo="CONSOLIDAR")
-
         st.session_state["resultados"] = {**res_control, **res_hist, **res_consol}
         st.session_state["indice_nomina"]=0
-
         if not st.session_state["resultados"]:
             st.info("No se encontraron coincidencias.")
 
 # =========================
 # Mostrar resultados
 # =========================
+resultados_ordenados = {}
 if st.session_state["resultados"]:
-    resultados_ordenados = {}
     if "NOMINA ACTUAL" in st.session_state["resultados"]:
         resultados_ordenados["NOMINA ACTUAL"] = st.session_state["resultados"]["NOMINA ACTUAL"]
     for hoja, df_res in st.session_state["resultados"].items():
         if hoja != "NOMINA ACTUAL":
             resultados_ordenados[hoja] = df_res
 
-    for hoja, df_res in resultados_ordenados.items():
-        with st.expander(f"{hoja} ({len(df_res)} registros)"):
-            st.dataframe(df_res, use_container_width=True)
-else:
-    st.info("No hay resultados para mostrar.")
+# Aquí puedes incluir la función mostrar_nomina_actual() tal como la tenías en tu código anterior
 
 # =========================
 # Pie de página
