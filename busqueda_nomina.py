@@ -149,13 +149,13 @@ def cargar_hojas(xls, hojas):
 # CARGAR DATOS
 # =========================
 if st.button("📂 Cargar archivos desde Drive") or st.session_state["data_excel"] is None:
-    FILE_ID_CONTROL = "PON_AQUI_EL_ID"
-    FILE_ID_HISTORICO = "PON_AQUI_EL_ID"
-    FILE_ID_CONSOLIDAR = "PON_AQUI_EL_ID"
+    FILE_ID_CONTROL = "15H3ULUuPxBNo_nBHIjUdCiB1EK_ngAvZ"
+FILE_ID_HISTORICO = "OTRO_ID_DEL_HISTORICO"
+FILE_ID_CONSOLIDAR = "OTRO_ID_DEL_CONSOLIDAR"
 
-    xls_control = descargar_excel_drive(https://docs.google.com/spreadsheets/d/15H3ULUuPxBNo_nBHIjUdCiB1EK_ngAvZ/edit?usp=drive_link&ouid=109199175635163763551&rtpof=true&sd=true)
-    xls_historico = descargar_excel_drive(https://docs.google.com/spreadsheets/d/1sg_YeF-k9M6bv3GMpwzbNRIBWf0nf_S3/edit?usp=drive_link&ouid=109199175635163763551&rtpof=true&sd=true)
-    xls_consolidar = descargar_excel_drive(https://docs.google.com/spreadsheets/d/14xoBudN1KeCnNAm2yHiUYDLwFeBh0yA-/edit?usp=drive_link&ouid=109199175635163763551&rtpof=true&sd=true)
+xls_control = descargar_excel_drive(FILE_ID_CONTROL, EXCEL_CACHE_FILE)
+xls_historico = descargar_excel_drive(FILE_ID_HISTORICO, HISTORICO_CACHE_FILE)
+xls_consolidar = descargar_excel_drive(FILE_ID_CONSOLIDAR, CONSOLIDAR_CACHE_FILE)
 
     st.session_state["data_excel"] = cargar_hojas(xls_control, hojas_destino) if xls_control else {}
     st.session_state["data_historico"] = cargar_hojas(xls_historico, hoja_historico) if xls_historico else {}
@@ -286,3 +286,4 @@ st.markdown("""
         © Derechos Reservados. Angel Caracas.
     </div>
 """, unsafe_allow_html=True)
+
