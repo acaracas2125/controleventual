@@ -267,8 +267,19 @@ if buscar:
 # =========================
 # MOSTRAR RESULTADOS
 # =========================
-resultados_ordenados = {}
 if st.session_state["resultados"]:
+    resultados_ordenados = {}
+    # Primero NOMINA ACTUAL si existe
     if "NOMINA ACTUAL" in st.session_state["resultados"]:
         resultados_ordenados["NOMINA ACTUAL"] = st.session_state["resultados"]["NOMINA ACTUAL"]
-    for hoja, df_res in st.session_state["resultados
+    # Luego el resto de hojas
+    for hoja, df_res in st.session_state["resultados"].items():
+        if hoja != "NOMINA ACTUAL":
+            resultados_ordenados[hoja] = df_res
+
+    # Mostrar cada hoja en un expander
+    for hoja, df_res in resultados_ordenados.items():
+        with st.expander(f"{hoja} ({len(df_res)} registros)"):
+            st.dataframe(df_res, use_container_width=True)
+else:
+    st.info("No hay resultados para mostrar.")
