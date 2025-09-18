@@ -27,7 +27,13 @@ def hash_password(password):
 def descargar_excel_drive(url):
     """Descargar Excel desde Google Drive usando el link de compartir"""
     try:
-        file_id = url.split("/d/")[1].split("/")[0]
+        # Extraer el file_id del URL, sin importar parámetros extras
+        import re
+        match = re.search(r"/d/([a-zA-Z0-9-_]+)", url)
+        if not match:
+            st.warning(f"No se pudo extraer el file_id del URL: {url}")
+            return None
+        file_id = match.group(1)
         download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
         resp = requests.get(download_url)
         if resp.status_code != 200 or not resp.content[:2] == b'PK':
@@ -37,6 +43,7 @@ def descargar_excel_drive(url):
     except Exception as e:
         st.warning(f"No se pudo descargar el archivo: {e}")
         return None
+
 
 def cargar_hojas(xls, hojas):
     """Cargar hojas específicas de un archivo Excel (BytesIO o path)"""
@@ -320,3 +327,4 @@ st.markdown("""
         © Derechos Reservados. Angel Caracas.
     </div>
 """, unsafe_allow_html=True)
+
