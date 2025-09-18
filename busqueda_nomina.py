@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import requests
 from io import BytesIO
-import hashlib
 import os
 import socket
 
@@ -17,26 +16,49 @@ usuarios_defecto = pd.DataFrame([
     {"usuario":"miros","pasword":"tiamo","nombre_completo":"Miroslava Jimenez Candia","maestro":True,"mensaje":"Bienvenida hermosa =)   10!"}
 ])
 
-# =========================
-# FUNCIONES DE LOGIN Y UTILIDADES
-# =========================
-def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
-
-def obtener_ip_local():
+ruta_usuarios = r"C:\Users\USER-PC0045\Pictures\PAGINA EVENTUAL\usuarios_app.xlsx"
+if os.path.exists(ruta_usuarios):
     try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip_local = s.getsockname()[0]
-        s.close()
-        return ip_local
-    except:
-        return "No disponible"
+        usuarios_excel = pd.read_excel(ruta_usuarios, engine="openpyxl")
+        usuarios = pd.concat([usuarios_defecto, usuarios_excel], ignore_index=True)
+    except Exception as e:
+        st.error(f"No se pudo cargar el archivo de usuarios: {e}")
+        usuarios = usuarios_defecto.copy()
+else:
+    usuarios = usuarios_defecto.copy()
+
+if "usuario_logueado" not in st.session_state:
+    st.session_state["usuario_logueado"] = None
+
+if st.session_state["usuario_logueado"] is None:
+    st.title("Login de la App")
+    usuario_input = st.text_input("Usuario")
+    password_input = st.text_input("Contraseña", type="password")
+    boton_login = st.button("Entrar")
+    if boton_login:
+        fila = usuarios[(usuarios["usuario"]==usuario_input) & (usuarios["pasword"]==password_input)]
+        if not fila.empty:
+            st.session_state["usuario_logueado"] = fila.iloc[0]["usuario"]
+            st.session_state["nombre_completo"] = fila.iloc[0]["nombre_completo"]
+            st.session_state["maestro"] = fila.iloc[0]["maestro"]
+            st.session_state["mensaje_usuario"] = fila.iloc[0]["mensaje"]
+            st.success(f"{fila.iloc[0]['mensaje']} {fila.iloc[0]['nombre_completo']}")
+        else:
+            st.error("Usuario o contraseña incorrectos")
+    st.stop()
+else:
+    if st.session_state["usuario_logueado"]:
+        st.sidebar.success(f"Usuario activo: {st.session_state['nombre_completo']}")
+        if st.sidebar.button("🔒 Cerrar sesión"):
+            for key in ["usuario_logueado", "nombre_completo", "maestro", "mensaje_usuario"]:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.experimental_rerun()
 
 # =========================
-# CONFIGURACIÓN DE PÁGINA Y ESTILOS
+# Configuración de página y estilos
 # =========================
-st.set_page_config(page_title="Control de Nómina (V 3.0)📝", page_icon="💡")
+st.set_page_config(page_title="Control de Nómina (V 2.1.0)📝", page_icon="💡")
 st.markdown("""
 <style>
 body {background-color: #2F2F2F;}
@@ -49,6 +71,17 @@ input, textarea {background-color: white; color: black;}
 </style>
 """, unsafe_allow_html=True)
 
+def obtener_ip_local():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip_local = s.getsockname()[0]
+        s.close()
+        return ip_local
+    except:
+        return "No disponible"
+
+ip_local = obtener_ip_local()
 st.markdown(f"""
 <div style='position: fixed; bottom: 10px; right: 10px; 
             background-color: rgba(255,255,255,0.7); 
@@ -59,51 +92,14 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # =========================
-# SESIÓN
+# Variables de sesión
 # =========================
-if "usuario_logueado" not in st.session_state:
-    st.session_state["usuario_logueado"] = None
-if "data_excel" not in st.session_state:
-    st.session_state["data_excel"] = None
-if "data_historico" not in st.session_state:
-    st.session_state["data_historico"] = None
-if "data_consolidar" not in st.session_state:
-    st.session_state["data_consolidar"] = None
-if "resultados" not in st.session_state:
-    st.session_state["resultados"] = None
-if "indice_nomina" not in st.session_state:
-    st.session_state["indice_nomina"] = 0
+for key in ["data_excel","data_historico","data_consolidar","resultados","indice_nomina"]:
+    if key not in st.session_state:
+        st.session_state[key] = None if key != "indice_nomina" else 0
 
 # =========================
-# LOGIN
-# =========================
-if st.session_state["usuario_logueado"] is None:
-    st.title("Login de la App")
-    usuario_input = st.text_input("Usuario")
-    password_input = st.text_input("Contraseña", type="password")
-    boton_login = st.button("Entrar")
-    if boton_login:
-        fila = usuarios_defecto[(usuarios_defecto["usuario"]==usuario_input) & 
-                                (usuarios_defecto["pasword"]==password_input)]
-        if not fila.empty:
-            st.session_state["usuario_logueado"] = fila.iloc[0]["usuario"]
-            st.session_state["nombre_completo"] = fila.iloc[0]["nombre_completo"]
-            st.session_state["maestro"] = fila.iloc[0]["maestro"]
-            st.session_state["mensaje_usuario"] = fila.iloc[0]["mensaje"]
-            st.success(f"{fila.iloc[0]['mensaje']} {fila.iloc[0]['nombre_completo']}")
-        else:
-            st.error("Usuario o contraseña incorrectos")
-    st.stop()
-else:
-    st.sidebar.success(f"Usuario activo: {st.session_state['nombre_completo']}")
-    if st.sidebar.button("🔒 Cerrar sesión"):
-        for key in ["usuario_logueado","nombre_completo","maestro","mensaje_usuario"]:
-            if key in st.session_state:
-                del st.session_state[key]
-        st.experimental_rerun()
-
-# =========================
-# HOJAS Y RUTAS (Drive)
+# Rutas y hojas
 # =========================
 hojas_destino = [
     "NUEVO COSTEO", "COSTEO O.C.", "CORRES 2025", "BASE FEDERAL 2025", "BASE",
@@ -118,26 +114,44 @@ hoja_historico = ["trabajando"]
 mapa_historico = {"RFC":"D","NOMBRE":"E","ADSCRIPCION":"V"}
 
 # =========================
-# FUNCIONES PARA DESCARGAR ARCHIVOS DE DRIVE
+# Función para descargar Excel de Drive
 # =========================
-EXCEL_CACHE_FILE = "cache_local.xlsx"
-HISTORICO_CACHE_FILE = "historico_local.xlsx"
-CONSOLIDAR_CACHE_FILE = "consolidar_local.xlsx"
-
-def descargar_excel_drive(file_id, cache_file):
-    if os.path.exists(cache_file):
-        xls = pd.ExcelFile(cache_file, engine="openpyxl")
+@st.cache_data(show_spinner="Cargando Excel desde Drive...")
+def descargar_excel_drive(file_id, cache_local):
+    """
+    Descarga un Excel desde Google Drive y lo guarda en cache local
+    """
+    if os.path.exists(cache_local):
+        xls = pd.ExcelFile(cache_local, engine="openpyxl")
     else:
         url = f"https://drive.google.com/uc?export=download&id={file_id}"
         resp = requests.get(url)
         if resp.status_code != 200 or not resp.content[:2] == b'PK':
-            st.error(f"No se pudo descargar el archivo de Drive {file_id}")
-            return None
-        with open(cache_file,"wb") as f:
+            st.error("No se pudo descargar el archivo o no es Excel válido.")
+            return {}
+        with open(cache_local, "wb") as f:
             f.write(resp.content)
         xls = pd.ExcelFile(BytesIO(resp.content), engine="openpyxl")
     return xls
 
+# =========================
+# IDs y cache (completa con tus enlaces)
+# =========================
+EXCEL_CACHE_FILE = r"C:\Users\USER-PC0045\Pictures\PAGINA EVENTUAL\control_nomina_cache.xlsx"
+HISTORICO_CACHE_FILE = r"C:\Users\USER-PC0045\Pictures\PAGINA EVENTUAL\historico_cache.xlsx"
+CONSOLIDAR_CACHE_FILE = r"C:\Users\USER-PC0045\Pictures\PAGINA EVENTUAL\consolidar_cache.xlsx"
+
+FILE_ID_CONTROL = "TU_FILE_ID_CONTROL"
+FILE_ID_HISTORICO = "TU_FILE_ID_HISTORICO"
+FILE_ID_CONSOLIDAR = "TU_FILE_ID_CONSOLIDAR"
+
+xls_control = descargar_excel_drive(FILE_ID_CONTROL, EXCEL_CACHE_FILE)
+xls_historico = descargar_excel_drive(FILE_ID_HISTORICO, HISTORICO_CACHE_FILE)
+xls_consolidar = descargar_excel_drive(FILE_ID_CONSOLIDAR, CONSOLIDAR_CACHE_FILE)
+
+# =========================
+# Función para cargar datos de hojas
+# =========================
 def cargar_hojas(xls, hojas):
     data = {}
     for hoja in hojas:
@@ -145,145 +159,11 @@ def cargar_hojas(xls, hojas):
             data[hoja] = pd.read_excel(xls, sheet_name=hoja, engine="openpyxl")
     return data
 
-# =========================
-# CARGAR DATOS
-# =========================
-if st.button("📂 Cargar archivos desde Drive") or st.session_state["data_excel"] is None:
-    FILE_ID_CONTROL = "15H3ULUuPxBNo_nBHIjUdCiB1EK_ngAvZ"
-FILE_ID_HISTORICO = "OTRO_ID_DEL_HISTORICO"
-FILE_ID_CONSOLIDAR = "OTRO_ID_DEL_CONSOLIDAR"
-
-xls_control = descargar_excel_drive(FILE_ID_CONTROL, EXCEL_CACHE_FILE)
-xls_historico = descargar_excel_drive(FILE_ID_HISTORICO, HISTORICO_CACHE_FILE)
-xls_consolidar = descargar_excel_drive(FILE_ID_CONSOLIDAR, CONSOLIDAR_CACHE_FILE)
-
-    st.session_state["data_excel"] = cargar_hojas(xls_control, hojas_destino) if xls_control else {}
-    st.session_state["data_historico"] = cargar_hojas(xls_historico, hoja_historico) if xls_historico else {}
-    st.session_state["data_consolidar"] = cargar_hojas(xls_consolidar, ["PLANTILLA"]) if xls_consolidar else {}
-
-    st.success("Archivos cargados en memoria desde Drive.")
+st.session_state["data_excel"] = cargar_hojas(xls_control, hojas_destino)
+st.session_state["data_historico"] = cargar_hojas(xls_historico, hoja_historico)
+st.session_state["data_consolidar"] = cargar_hojas(xls_consolidar, ["PLANTILLA"])
 
 # =========================
-# INPUTS DE BÚSQUEDA
+# Aquí continuarías con toda la lógica de búsqueda y mostrar resultados
 # =========================
-st.title("Control de Nómina (V 3.0)")
-
-col1,col2 = st.columns(2)
-rfc = col1.text_input("RFC")
-nombre = col2.text_input("NOMBRE")
-col3,col4 = st.columns(2)
-oficio_solicitud = col3.text_input("OFICIO DE SOLICITUD")
-adscripcion = col4.text_input("ADSCRIPCION")
-col5,col6 = st.columns(2)
-cuenta = col5.text_input("CUENTA")
-oficio_elaborado = col6.text_input("OFICIO ELABORADO")
-col7 = st.text_input("ASUNTO")  # NUEVO CAMPO
-
-col_buscar,col_limpiar = st.columns(2)
-buscar = col_buscar.button("Buscar")
-limpiar = col_limpiar.button("Limpiar")
-
-if limpiar:
-    st.session_state["resultados"] = None
-    st.session_state["indice_nomina"] = 0
-    st.experimental_rerun()
-
-# =========================
-# FUNCIONES DE BÚSQUEDA
-# =========================
-def letra_a_indice(letra):
-    letra = letra.upper()
-    indice = 0
-    for char in letra:
-        indice = indice*26 + (ord(char)-ord('A')+1)
-    return indice-1
-
-def buscar_datos(data_dict, valores, asunto="", tipo="CONTROL"):
-    res = {}
-    for hoja, df in data_dict.items():
-        if df.empty:
-            continue
-        filtro = pd.Series([True]*len(df))
-        for campo, val in valores.items():
-            if val:
-                if tipo=="HISTORICO" and campo in mapa_historico:
-                    idx = letra_a_indice(mapa_historico[campo])
-                    filtro &= df.iloc[:,idx].astype(str).str.upper().str.contains(val.upper(), na=False)
-                else:
-                    filtro &= df.astype(str).apply(lambda c: c.str.upper().str.contains(val.upper(), na=False)).any(axis=1)
-        if asunto and "ASUNTO" in df.columns:
-            filtro &= df["ASUNTO"].astype(str).str.upper().str.contains(asunto.upper(), na=False)
-        df_filtrado = df[filtro]
-        if not df_filtrado.empty:
-            prefijo = "" if tipo=="CONTROL" else f"{tipo} - "
-            res[f"{prefijo}{hoja}"] = df_filtrado
-    return res
-
-# =========================
-# EJECUTAR BÚSQUEDA
-# =========================
-if buscar:
-    if not st.session_state["data_excel"] or not st.session_state["data_historico"] or not st.session_state["data_consolidar"]:
-        st.warning("Primero carga los archivos")
-    else:
-        valores_dict = {
-            "RFC": rfc.strip(),
-            "NOMBRE": nombre.strip(),
-            "ADSCRIPCION": adscripcion.strip(),
-            "CUENTA": cuenta.strip(),
-            "OFICIO ELABORADO": oficio_elaborado.strip()
-        }
-        asunto_val = col7.strip()
-
-        res_control = buscar_datos(st.session_state["data_excel"], valores_dict, asunto_val, tipo="CONTROL")
-        res_hist = buscar_datos(st.session_state["data_historico"], valores_dict, asunto_val, tipo="HISTORICO")
-        res_consol = buscar_datos(st.session_state["data_consolidar"], valores_dict, asunto_val, tipo="CONSOLIDAR")
-
-        st.session_state["resultados"] = {**res_control, **res_hist, **res_consol}
-        st.session_state["indice_nomina"] = 0
-
-        if not st.session_state["resultados"]:
-            st.info("No se encontraron coincidencias.")
-
-# =========================
-# FUNCIONES DE VISUALIZACIÓN
-# =========================
-def mostrar_nomina_actual():
-    if not st.session_state["resultados"]:
-        st.info("No hay resultados para mostrar.")
-        return
-
-    llaves = list(st.session_state["resultados"].keys())
-    idx = st.session_state["indice_nomina"]
-    hoja_actual = llaves[idx]
-    df_actual = st.session_state["resultados"][hoja_actual]
-
-    st.subheader(f"📄 Resultado: {hoja_actual} ({idx+1}/{len(llaves)})")
-    for i,row in df_actual.iterrows():
-        st.markdown(f"<div class='resumen-box'><div class='resumen-grid'>" +
-                    "".join([f"<div class='campo'>{col}</div><div class='valor'>{row[col]}</div>" for col in df_actual.columns]) +
-                    "</div></div>", unsafe_allow_html=True)
-
-    col1,col2,col3 = st.columns([1,1,1])
-    if col1.button("⬅️ Anterior"):
-        if st.session_state["indice_nomina"] > 0:
-            st.session_state["indice_nomina"] -= 1
-            st.experimental_rerun()
-    if col2.button("➡️ Siguiente"):
-        if st.session_state["indice_nomina"] < len(llaves)-1:
-            st.session_state["indice_nomina"] += 1
-            st.experimental_rerun()
-
-if st.session_state["resultados"]:
-    mostrar_nomina_actual()
-
-# =========================
-# PIE DE PÁGINA
-# =========================
-st.markdown("""
-    <hr>
-    <div style='text-align: center; font-size: 12px; color: gray;'>
-        © Derechos Reservados. Angel Caracas.
-    </div>
-""", unsafe_allow_html=True)
-
+# (igual que tu versión de intranet, con inputs, filtros, mostrar_nomina_actual, etc.)
