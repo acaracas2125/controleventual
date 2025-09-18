@@ -14,9 +14,9 @@ CONSULTAS_FILE = "consultas.csv"
 MENSAJE_FILE = "mensaje.txt"
 
 # Pendientes: coloca aquí los links de Drive de cada archivo Excel
-DRIVE_CONTROL = "AQUI_LINK_CONTROL"
-DRIVE_HISTORICO = "AQUI_LINK_HISTORICO"
-DRIVE_CONSOLIDAR = "AQUI_LINK_CONSOLIDAR"
+DRIVE_CONTROL = "15H3ULUuPxBNo_nBHIjUdCiB1EK_ngAvZ"
+DRIVE_HISTORICO = "1sg_YeF-k9M6bv3GMpwzbNRIBWf0nf_S3"
+DRIVE_CONSOLIDAR = "14xoBudN1KeCnNAm2yHiUYDLwFeBh0yA"
 
 # =========================
 # Funciones de utilidad
@@ -327,4 +327,5 @@ st.markdown("""
         © Derechos Reservados. Angel Caracas.
     </div>
 """, unsafe_allow_html=True)
+
 
