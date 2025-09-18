@@ -2,61 +2,108 @@ import streamlit as st
 import pandas as pd
 import requests
 from io import BytesIO
-import os
 import hashlib
+import os
+import socket
 
 # =========================
-# Archivos
+# LOGIN DE USUARIOS
 # =========================
-USUARIOS_FILE = "usuarios.csv"
-CONSULTAS_FILE = "consultas.csv"
-MENSAJE_FILE = "mensaje.txt"
-EXCEL_CACHE_FILE = "datos_cache.xlsx"  # cache local del Excel
+usuarios_defecto = pd.DataFrame([
+    {"usuario":"acaracas","pasword":"cccc","nombre_completo":"Angel Caracas","maestro":True,"mensaje":"Bienvenido master"},
+    {"usuario":"lhernandez","pasword":"lau","nombre_completo":"Laura Hernández Rivera","maestro":True,"mensaje":"Bienvenida Lau"},
+    {"usuario":"adrian","pasword":"adrian","nombre_completo":"Adrian","maestro":True,"mensaje":"Bienvenido"},	
+    {"usuario":"omperez","pasword":"ositis","nombre_completo":"Osiris Monserrat Pérez nieto","maestro":True,"mensaje":"Bienvenida Ositis"},
+    {"usuario":"miros","pasword":"tiamo","nombre_completo":"Miroslava Jimenez Candia","maestro":True,"mensaje":"Bienvenida hermosa =)   10!"}
+])
 
 # =========================
-# Funciones
+# FUNCIONES DE LOGIN Y UTILIDADES
 # =========================
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
-# =========================
-# Crear o corregir usuarios por defecto
-# =========================
-usuarios_default = pd.DataFrame([
-    {
-        "usuario": "acaracas",
-        "password": hash_password("caracas"),
-        "rol": "maestro",
-        "nombre": "Administrador"
-    },
-    {
-        "usuario": "lhernandez",
-        "password": hash_password("lau"),
-        "rol": "usuario",
-        "nombre": "Luis Hernández"
-    },
-    {
-        "usuario": "omperez",
-        "password": hash_password("ositis"),
-        "rol": "usuario",
-        "nombre": "Omar Pérez"
-    }
-])
+def obtener_ip_local():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip_local = s.getsockname()[0]
+        s.close()
+        return ip_local
+    except:
+        return "No disponible"
 
-if not os.path.exists(USUARIOS_FILE):
-    usuarios_default.to_csv(USUARIOS_FILE, index=False)
-else:
-    usuarios_df = pd.read_csv(USUARIOS_FILE)
-    for _, row in usuarios_default.iterrows():
-        if row["usuario"] not in usuarios_df["usuario"].values:
-            usuarios_df = pd.concat([usuarios_df, pd.DataFrame([row])], ignore_index=True)
+# =========================
+# CONFIGURACIÓN DE PÁGINA Y ESTILOS
+# =========================
+st.set_page_config(page_title="Control de Nómina (V 3.0)📝", page_icon="💡")
+st.markdown("""
+<style>
+body {background-color: #2F2F2F;}
+input, textarea {background-color: white; color: black;}
+.resumen-box {background-color:#FFF; border-radius:6px; padding:6px; margin-bottom:6px; font-family:Arial, sans-serif; font-size:12px;}
+.resumen-box h3 {text-align:center; margin-bottom:4px; color:#006400; font-size:14px;}
+.resumen-grid {display:grid; grid-template-columns:1fr 2fr; row-gap:2px; column-gap:6px;}
+.campo {font-weight:bold;color:#000;}
+.valor {color:#0D47A1;font-weight:bold;}
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown(f"""
+<div style='position: fixed; bottom: 10px; right: 10px; 
+            background-color: rgba(255,255,255,0.7); 
+            padding: 5px 10px; border-radius: 5px; 
+            font-size: 12px; color: black; z-index:9999;'>
+    Accede desde otro equipo: http://127.0.0.1:8501/
+</div>
+""", unsafe_allow_html=True)
+
+# =========================
+# SESIÓN
+# =========================
+if "usuario_logueado" not in st.session_state:
+    st.session_state["usuario_logueado"] = None
+if "data_excel" not in st.session_state:
+    st.session_state["data_excel"] = None
+if "data_historico" not in st.session_state:
+    st.session_state["data_historico"] = None
+if "data_consolidar" not in st.session_state:
+    st.session_state["data_consolidar"] = None
+if "resultados" not in st.session_state:
+    st.session_state["resultados"] = None
+if "indice_nomina" not in st.session_state:
+    st.session_state["indice_nomina"] = 0
+
+# =========================
+# LOGIN
+# =========================
+if st.session_state["usuario_logueado"] is None:
+    st.title("Login de la App")
+    usuario_input = st.text_input("Usuario")
+    password_input = st.text_input("Contraseña", type="password")
+    boton_login = st.button("Entrar")
+    if boton_login:
+        fila = usuarios_defecto[(usuarios_defecto["usuario"]==usuario_input) & 
+                                (usuarios_defecto["pasword"]==password_input)]
+        if not fila.empty:
+            st.session_state["usuario_logueado"] = fila.iloc[0]["usuario"]
+            st.session_state["nombre_completo"] = fila.iloc[0]["nombre_completo"]
+            st.session_state["maestro"] = fila.iloc[0]["maestro"]
+            st.session_state["mensaje_usuario"] = fila.iloc[0]["mensaje"]
+            st.success(f"{fila.iloc[0]['mensaje']} {fila.iloc[0]['nombre_completo']}")
         else:
-            usuarios_df.loc[usuarios_df["usuario"] == row["usuario"], ["password", "rol", "nombre"]] = \
-                row[["password", "rol", "nombre"]].values
-    usuarios_df.to_csv(USUARIOS_FILE, index=False)
+            st.error("Usuario o contraseña incorrectos")
+    st.stop()
+else:
+    st.sidebar.success(f"Usuario activo: {st.session_state['nombre_completo']}")
+    if st.sidebar.button("🔒 Cerrar sesión"):
+        for key in ["usuario_logueado","nombre_completo","maestro","mensaje_usuario"]:
+            if key in st.session_state:
+                del st.session_state[key]
+        st.experimental_rerun()
 
 # =========================
-# Excel
+# HOJAS Y RUTAS (Drive)
 # =========================
 hojas_destino = [
     "NUEVO COSTEO", "COSTEO O.C.", "CORRES 2025", "BASE FEDERAL 2025", "BASE",
@@ -67,219 +114,175 @@ hojas_destino = [
     "Hoja1 (5)", "NOMINA ACTUAL", "DIVERSOS", "FORMATOS DE DESC. DIV",
     "CHEQUES-REVERSOS", "PENSIONES Y FORMATOS"
 ]
+hoja_historico = ["trabajando"]
+mapa_historico = {"RFC":"D","NOMBRE":"E","ADSCRIPCION":"V"}
 
-def excel_col_to_index(col):
-    col = col.upper()
-    index = 0
-    for char in col:
-        index = index * 26 + (ord(char) - ord('A') + 1)
-    return index - 1
+# =========================
+# FUNCIONES PARA DESCARGAR ARCHIVOS DE DRIVE
+# =========================
+EXCEL_CACHE_FILE = "cache_local.xlsx"
+HISTORICO_CACHE_FILE = "historico_local.xlsx"
+CONSOLIDAR_CACHE_FILE = "consolidar_local.xlsx"
 
-@st.cache_data(show_spinner="Cargando Excel (desde cache local o Google Drive)...")
-def cargar_datos_drive(file_id, hojas):
-    # Si ya existe cache local, usarlo
-    if os.path.exists(EXCEL_CACHE_FILE):
-        xls = pd.ExcelFile(EXCEL_CACHE_FILE, engine="openpyxl")
+def descargar_excel_drive(file_id, cache_file):
+    if os.path.exists(cache_file):
+        xls = pd.ExcelFile(cache_file, engine="openpyxl")
     else:
-        # Descargar de Google Drive
         url = f"https://drive.google.com/uc?export=download&id={file_id}"
         resp = requests.get(url)
         if resp.status_code != 200 or not resp.content[:2] == b'PK':
-            st.error("No se pudo descargar el archivo o no es Excel válido.")
-            return {}
-        # Guardar archivo en cache local
-        with open(EXCEL_CACHE_FILE, "wb") as f:
+            st.error(f"No se pudo descargar el archivo de Drive {file_id}")
+            return None
+        with open(cache_file,"wb") as f:
             f.write(resp.content)
         xls = pd.ExcelFile(BytesIO(resp.content), engine="openpyxl")
+    return xls
 
-    # Leer hojas solicitadas
+def cargar_hojas(xls, hojas):
     data = {}
     for hoja in hojas:
         if hoja in xls.sheet_names:
             data[hoja] = pd.read_excel(xls, sheet_name=hoja, engine="openpyxl")
     return data
 
-def buscar_coincidencias(data, valores_buscar):
-    resultados = {}
-    for hoja, df in data.items():
+# =========================
+# CARGAR DATOS
+# =========================
+if st.button("📂 Cargar archivos desde Drive") or st.session_state["data_excel"] is None:
+    FILE_ID_CONTROL = "PON_AQUI_EL_ID"
+    FILE_ID_HISTORICO = "PON_AQUI_EL_ID"
+    FILE_ID_CONSOLIDAR = "PON_AQUI_EL_ID"
+
+    xls_control = descargar_excel_drive(https://docs.google.com/spreadsheets/d/15H3ULUuPxBNo_nBHIjUdCiB1EK_ngAvZ/edit?usp=drive_link&ouid=109199175635163763551&rtpof=true&sd=true)
+    xls_historico = descargar_excel_drive(https://docs.google.com/spreadsheets/d/1sg_YeF-k9M6bv3GMpwzbNRIBWf0nf_S3/edit?usp=drive_link&ouid=109199175635163763551&rtpof=true&sd=true)
+    xls_consolidar = descargar_excel_drive(https://docs.google.com/spreadsheets/d/14xoBudN1KeCnNAm2yHiUYDLwFeBh0yA-/edit?usp=drive_link&ouid=109199175635163763551&rtpof=true&sd=true)
+
+    st.session_state["data_excel"] = cargar_hojas(xls_control, hojas_destino) if xls_control else {}
+    st.session_state["data_historico"] = cargar_hojas(xls_historico, hoja_historico) if xls_historico else {}
+    st.session_state["data_consolidar"] = cargar_hojas(xls_consolidar, ["PLANTILLA"]) if xls_consolidar else {}
+
+    st.success("Archivos cargados en memoria desde Drive.")
+
+# =========================
+# INPUTS DE BÚSQUEDA
+# =========================
+st.title("Control de Nómina (V 3.0)")
+
+col1,col2 = st.columns(2)
+rfc = col1.text_input("RFC")
+nombre = col2.text_input("NOMBRE")
+col3,col4 = st.columns(2)
+oficio_solicitud = col3.text_input("OFICIO DE SOLICITUD")
+adscripcion = col4.text_input("ADSCRIPCION")
+col5,col6 = st.columns(2)
+cuenta = col5.text_input("CUENTA")
+oficio_elaborado = col6.text_input("OFICIO ELABORADO")
+col7 = st.text_input("ASUNTO")  # NUEVO CAMPO
+
+col_buscar,col_limpiar = st.columns(2)
+buscar = col_buscar.button("Buscar")
+limpiar = col_limpiar.button("Limpiar")
+
+if limpiar:
+    st.session_state["resultados"] = None
+    st.session_state["indice_nomina"] = 0
+    st.experimental_rerun()
+
+# =========================
+# FUNCIONES DE BÚSQUEDA
+# =========================
+def letra_a_indice(letra):
+    letra = letra.upper()
+    indice = 0
+    for char in letra:
+        indice = indice*26 + (ord(char)-ord('A')+1)
+    return indice-1
+
+def buscar_datos(data_dict, valores, asunto="", tipo="CONTROL"):
+    res = {}
+    for hoja, df in data_dict.items():
         if df.empty:
             continue
-        filtro = pd.Series([True] * len(df))
-        for valor in valores_buscar:
-            if valor:
-                cond = df.astype(str).apply(lambda col: col.str.upper().str.contains(valor.upper(), na=False))
-                filtro &= cond.any(axis=1)
+        filtro = pd.Series([True]*len(df))
+        for campo, val in valores.items():
+            if val:
+                if tipo=="HISTORICO" and campo in mapa_historico:
+                    idx = letra_a_indice(mapa_historico[campo])
+                    filtro &= df.iloc[:,idx].astype(str).str.upper().str.contains(val.upper(), na=False)
+                else:
+                    filtro &= df.astype(str).apply(lambda c: c.str.upper().str.contains(val.upper(), na=False)).any(axis=1)
+        if asunto and "ASUNTO" in df.columns:
+            filtro &= df["ASUNTO"].astype(str).str.upper().str.contains(asunto.upper(), na=False)
         df_filtrado = df[filtro]
         if not df_filtrado.empty:
-            resultados[hoja] = df_filtrado
-    return resultados
+            prefijo = "" if tipo=="CONTROL" else f"{tipo} - "
+            res[f"{prefijo}{hoja}"] = df_filtrado
+    return res
 
 # =========================
-# Interfaz Streamlit
+# EJECUTAR BÚSQUEDA
 # =========================
-st.title("Control de Nómina Eventual - Búsqueda")
+if buscar:
+    if not st.session_state["data_excel"] or not st.session_state["data_historico"] or not st.session_state["data_consolidar"]:
+        st.warning("Primero carga los archivos")
+    else:
+        valores_dict = {
+            "RFC": rfc.strip(),
+            "NOMBRE": nombre.strip(),
+            "ADSCRIPCION": adscripcion.strip(),
+            "CUENTA": cuenta.strip(),
+            "OFICIO ELABORADO": oficio_elaborado.strip()
+        }
+        asunto_val = col7.strip()
 
-usuarios_df = pd.read_csv(USUARIOS_FILE)
+        res_control = buscar_datos(st.session_state["data_excel"], valores_dict, asunto_val, tipo="CONTROL")
+        res_hist = buscar_datos(st.session_state["data_historico"], valores_dict, asunto_val, tipo="HISTORICO")
+        res_consol = buscar_datos(st.session_state["data_consolidar"], valores_dict, asunto_val, tipo="CONSOLIDAR")
+
+        st.session_state["resultados"] = {**res_control, **res_hist, **res_consol}
+        st.session_state["indice_nomina"] = 0
+
+        if not st.session_state["resultados"]:
+            st.info("No se encontraron coincidencias.")
 
 # =========================
-# Manejo de sesión
+# FUNCIONES DE VISUALIZACIÓN
 # =========================
-if "logueado" not in st.session_state:
-    st.session_state.logueado = False
-    st.session_state.usuario = None
-    st.session_state.rol = None
+def mostrar_nomina_actual():
+    if not st.session_state["resultados"]:
+        st.info("No hay resultados para mostrar.")
+        return
+
+    llaves = list(st.session_state["resultados"].keys())
+    idx = st.session_state["indice_nomina"]
+    hoja_actual = llaves[idx]
+    df_actual = st.session_state["resultados"][hoja_actual]
+
+    st.subheader(f"📄 Resultado: {hoja_actual} ({idx+1}/{len(llaves)})")
+    for i,row in df_actual.iterrows():
+        st.markdown(f"<div class='resumen-box'><div class='resumen-grid'>" +
+                    "".join([f"<div class='campo'>{col}</div><div class='valor'>{row[col]}</div>" for col in df_actual.columns]) +
+                    "</div></div>", unsafe_allow_html=True)
+
+    col1,col2,col3 = st.columns([1,1,1])
+    if col1.button("⬅️ Anterior"):
+        if st.session_state["indice_nomina"] > 0:
+            st.session_state["indice_nomina"] -= 1
+            st.experimental_rerun()
+    if col2.button("➡️ Siguiente"):
+        if st.session_state["indice_nomina"] < len(llaves)-1:
+            st.session_state["indice_nomina"] += 1
+            st.experimental_rerun()
+
+if st.session_state["resultados"]:
+    mostrar_nomina_actual()
 
 # =========================
-# Login
+# PIE DE PÁGINA
 # =========================
-st.sidebar.title("🔑 Iniciar sesión")
-
-if not st.session_state.logueado:
-    usuario_input = st.sidebar.text_input("Usuario", key="usuario_login")
-    password_input = st.sidebar.text_input("Contraseña", type="password", key="password_login")
-    login_btn = st.sidebar.button("Entrar")
-
-    if login_btn:
-        hash_input = hash_password(password_input)
-        match = usuarios_df[
-            (usuarios_df["usuario"] == usuario_input) &
-            (usuarios_df["password"] == hash_input)
-        ]
-        if not match.empty:
-            st.session_state.logueado = True
-            st.session_state.usuario = match.iloc[0]["usuario"]
-            st.session_state.rol = match.iloc[0]["rol"]
-            st.session_state.nombre = match.iloc[0]["nombre"]
-            st.rerun()
-        else:
-            st.error("Usuario o contraseña incorrectos.")
-
-else:
-    st.sidebar.success(f"Conectado como {st.session_state.usuario} ({st.session_state.rol})")
-    if st.sidebar.button("Cerrar sesión"):
-        st.session_state.clear()
-        st.rerun()
-
-    # =========================
-    # Administración de usuarios (solo maestro)
-    # =========================
-    if st.session_state.rol == "maestro":
-        st.sidebar.subheader("👥 Administración de usuarios")
-        menu_admin = st.sidebar.selectbox(
-            "Selecciona acción", ["--", "Agregar usuario", "Eliminar usuario", "Editar usuario", "Editar mensaje bienvenida"]
-        )
-
-        if menu_admin == "Agregar usuario":
-            nuevo_usuario = st.sidebar.text_input("Usuario nuevo")
-            nuevo_password = st.sidebar.text_input("Contraseña", type="password")
-            nuevo_rol = st.sidebar.selectbox("Rol", ["usuario", "maestro"])
-            nuevo_nombre = st.sidebar.text_input("Nombre completo")
-            if st.sidebar.button("Guardar nuevo usuario"):
-                if nuevo_usuario and nuevo_password:
-                    df_nuevo = pd.DataFrame([[nuevo_usuario, hash_password(nuevo_password), nuevo_rol, nuevo_nombre]],
-                                            columns=["usuario","password","rol","nombre"])
-                    usuarios_df = pd.concat([usuarios_df, df_nuevo], ignore_index=True)
-                    usuarios_df.to_csv(USUARIOS_FILE, index=False)
-                    st.sidebar.success("Usuario agregado correctamente")
-
-        elif menu_admin == "Eliminar usuario":
-            seleccionar_usuario = st.sidebar.selectbox("Selecciona usuario a eliminar", usuarios_df["usuario"])
-            if st.sidebar.button("Eliminar"):
-                usuarios_df = usuarios_df[usuarios_df["usuario"] != seleccionar_usuario]
-                usuarios_df.to_csv(USUARIOS_FILE, index=False)
-                st.sidebar.success("Usuario eliminado")
-
-        elif menu_admin == "Editar usuario":
-            seleccionar_usuario = st.sidebar.selectbox("Selecciona usuario a editar", usuarios_df["usuario"])
-            nueva_password = st.sidebar.text_input("Nueva contraseña", type="password")
-            nuevo_rol = st.sidebar.selectbox("Nuevo rol", ["usuario", "maestro"])
-            nuevo_nombre = st.sidebar.text_input("Nuevo nombre completo")
-            if st.sidebar.button("Guardar cambios"):
-                if nueva_password:
-                    usuarios_df.loc[usuarios_df["usuario"] == seleccionar_usuario, "password"] = hash_password(nueva_password)
-                usuarios_df.loc[usuarios_df["usuario"] == seleccionar_usuario, "rol"] = nuevo_rol
-                if nuevo_nombre:
-                    usuarios_df.loc[usuarios_df["usuario"] == seleccionar_usuario, "nombre"] = nuevo_nombre
-                usuarios_df.to_csv(USUARIOS_FILE, index=False)
-                st.sidebar.success("Usuario actualizado")
-
-        elif menu_admin == "Editar mensaje bienvenida":
-            mensaje_bienvenida = ""
-            if os.path.exists(MENSAJE_FILE):
-                with open(MENSAJE_FILE, "r", encoding="utf-8") as f:
-                    mensaje_bienvenida = f.read()
-            nuevo_mensaje = st.sidebar.text_input("Mensaje de bienvenida", value=mensaje_bienvenida)
-            if st.sidebar.button("Guardar mensaje"):
-                with open(MENSAJE_FILE, "w", encoding="utf-8") as f:
-                    f.write(nuevo_mensaje)
-                st.sidebar.success("Mensaje actualizado")
-
-    # =========================
-    # Campos de búsqueda (solo si logueado)
-    # =========================
-    st.title("🔍 Buscar en Nómina")
-
-    file_id = "17O33v9JmMsItavMNm7qw4MX2Zx_K7a2f"
-
-    # Botón actualizar datos solo para maestro
-    if st.session_state.rol == "maestro":
-        if st.button("Actualizar datos de base"):
-            if os.path.exists(EXCEL_CACHE_FILE):
-                os.remove(EXCEL_CACHE_FILE)   # borra cache local
-            cargar_datos_drive.clear()        # borra cache de streamlit
-            st.success("Caché borrado. La próxima búsqueda descargará el archivo actualizado desde Drive.")
-
-    # Inputs de búsqueda
-    col1, col2 = st.columns(2)
-    rfc = col1.text_input("RFC", key="rfc")
-    nombre = col2.text_input("NOMBRE", key="nombre_busqueda")
-    col3, col4 = st.columns(2)
-    oficio_solicitud = col3.text_input("OFICIO DE SOLICITUD", key="oficio_solicitud")
-    adscripcion = col4.text_input("ADSCRIPCION", key="adscripcion")
-    col5, col6 = st.columns(2)
-    cuenta = col5.text_input("CUENTA", key="cuenta")
-    oficio_elaborado = col6.text_input("OFICIO ELABORADO", key="oficio_elaborado")
-
-    # Botón buscar
-    if st.button("Buscar"):
-        try:
-            data = cargar_datos_drive(file_id, hojas_destino)
-            valores = [rfc.strip(), nombre.strip(), oficio_solicitud.strip(),
-                       adscripcion.strip(), cuenta.strip(), oficio_elaborado.strip()]
-            resultados = buscar_coincidencias(data, valores)
-
-            # Guardar consultas
-            consulta = {"usuario": st.session_state.usuario, "criterios": str(valores)}
-            if os.path.exists(CONSULTAS_FILE):
-                consultas_df = pd.read_csv(CONSULTAS_FILE)
-                nuevo_df = pd.DataFrame([consulta])
-                consultas_df = pd.concat([consultas_df, nuevo_df], ignore_index=True)
-            else:
-                consultas_df = pd.DataFrame([consulta])
-            consultas_df.to_csv(CONSULTAS_FILE, index=False)
-
-            if not resultados:
-                st.info("No se encontraron coincidencias.")
-            else:
-                for hoja, df_res in resultados.items():
-                    st.subheader(f"Resultados de '{hoja}'")
-                    st.dataframe(df_res, width=1500, height=180)
-        except Exception as e:
-            st.error(f"Error al procesar: {e}")
-
-    # Limpiar
-    if st.button("Limpiar"):
-        st.experimental_rerun()
-
-    # =========================
-    # Pie de página
-    # =========================
-    st.markdown(
-        """
-        <hr>
-        <div style='text-align: center; font-size: 12px; color: gray;'>
-            © Derechos Reservados. LACB  =)
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+st.markdown("""
+    <hr>
+    <div style='text-align: center; font-size: 12px; color: gray;'>
+        © Derechos Reservados. Angel Caracas.
+    </div>
+""", unsafe_allow_html=True)
