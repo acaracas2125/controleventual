@@ -3,8 +3,53 @@ import pandas as pd
 import os
 import socket
 import io
-import numpy as np
-import requests  # 🔹 para descargar desde Drive
+import numpy as np  # <- para búsquedas rápidas
+import requests
+
+# =========================
+# Función para descargar archivos desde Google Drive
+# =========================
+def descargar_drive(url, destino):
+    """Descarga un archivo desde un enlace directo de Google Drive."""
+    try:
+        r = requests.get(url, allow_redirects=True)
+        if r.status_code == 200:
+            with open(destino, "wb") as f:
+                f.write(r.content)
+            if os.path.getsize(destino) < 1024:
+                st.warning(f"El archivo {destino} parece estar vacío o corrupto.")
+                return False
+            return True
+        else:
+            st.warning(f"No se pudo descargar: {url}")
+            return False
+    except Exception as e:
+        st.error(f"Error descargando {url}: {e}")
+        return False
+
+# =========================
+# URLs directas de Google Drive (export=download)
+# =========================
+urls_drive = {
+    "control_nomina.xlsx": "https://drive.google.com/uc?export=download&id=17O33v9JmMsItavMNm7qw4MX2Zx_K7a2f",
+    "Historico.xlsx":      "https://drive.google.com/uc?export=download&id=10KPDPXUKVF4ogCKzTugI7IbQ0HDzxS3Z",
+    "CONSOLIDAR.xlsx":     "https://drive.google.com/uc?export=download&id=1jzTeF5Trhi2-zAZgzzLPZEEcBDOMyDJT",
+    "PLANTILLA.xlsx":      "https://drive.google.com/uc?export=download&id=1veDSctRyAc1LewNvkamqOfRUnW5tWXQN",
+    "VARIOS.xlsx":         "https://drive.google.com/uc?export=download&id=15oo1JnSuNaT9QUGplu7X8qAwHpbQ8RFa"
+}
+
+# =========================
+# Carpeta local temporal
+# =========================
+carpeta = r"C:\Users\USER-PC0045\Pictures\PAGINA EVENTUAL"
+os.makedirs(carpeta, exist_ok=True)
+
+# Descargar archivos si no existen o están corruptos
+for nombre, url in urls_drive.items():
+    destino = os.path.join(carpeta, nombre)
+    if not os.path.exists(destino) or os.path.getsize(destino) < 1024:
+        st.info(f"Descargando {nombre} desde Google Drive...")
+        descargar_drive(url, destino)
 
 # =========================
 # LOGIN DE USUARIOS
@@ -14,11 +59,11 @@ usuarios_defecto = pd.DataFrame([
     {"usuario":"lhernandez","pasword":"lau","nombre_completo":"Laura Hernández Rivera","maestro":True,"mensaje":"Bienvenida Lau"},
     {"usuario":"abigail","pasword":"liz","nombre_completo":"Lizbeth Abigail Candelaria Marcos Martinez","maestro":True,"mensaje":"Bienvenida Lizbeth Abigail"},
     {"usuario":"marcos","pasword":"jefesito","nombre_completo":"Marco Antonio Alarcón Hernández","maestro":True,"mensaje":"Bienvenido Marcos"},    
-    {"usuario":"omperez","pasword":"ositis","nombre_completo":"Osiris Monserrat Pérez Nieto","maestro":True,"mensaje":"Bienvenida Ositis"},
+    {"usuario":"omperez","pasword":"ositis","nombre_completo":"Osiris Monserrat Pérez nieto","maestro":True,"mensaje":"Bienvenida Ositis"},
     {"usuario":"miros","pasword":"tiamo","nombre_completo":"Miroslava Jimenez Candia","maestro":True,"mensaje":"Bienvenida hermosa =)   10!"}
 ])
 
-ruta_usuarios = r"C:\Users\USER-PC0045\Pictures\PAGINA EVENTUAL\usuarios_app.xlsx"
+ruta_usuarios = os.path.join(carpeta, "usuarios_app.xlsx")
 if os.path.exists(ruta_usuarios):
     try:
         usuarios_excel = pd.read_excel(ruta_usuarios, engine="openpyxl")
@@ -32,6 +77,9 @@ else:
 if "usuario_logueado" not in st.session_state:
     st.session_state["usuario_logueado"] = None
 
+# =========================
+# LOGIN
+# =========================
 if st.session_state["usuario_logueado"] is None:
     st.title("Login de la App")
     usuario_input = st.text_input("Usuario")
@@ -54,6 +102,18 @@ if st.session_state["usuario_logueado"] is None:
 # =========================
 if st.session_state.get("usuario_logueado"):
     st.sidebar.success(f"Usuario activo: {st.session_state['nombre_completo']}")
+
+    with st.sidebar.expander("⚙️ Configuración"):
+        if st.button("🔒 Cerrar sesión"):
+            keys_a_borrar = ["usuario_logueado", "nombre_completo", "maestro", "mensaje_usuario",
+                             "data_excel","data_historico","data_consolidar","data_plantilla","data_varios",
+                             "resultados","resultados_mass","indice_nomina",
+                             "rfc","nombre","oficio_solicitud","adscripcion","cuenta","oficio_elaborado",
+                             "asunto","columna_busqueda","valor_busqueda","limpiar_form","df_manual_mass","df_busqueda"]
+            for key in keys_a_borrar:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.session_state.query_params = {}
 
 # =========================
 # Configuración de página y estilos
@@ -92,105 +152,46 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-def descargar_drive(url, destino):
-    """Descarga un archivo de Google Drive y valida que sea Excel válido."""
-    try:
-        r = requests.get(url, allow_redirects=True, stream=True)
-        if r.status_code == 200:
-            contenido = r.content
-            # Validar que no sea una página HTML (Drive devolviendo error)
-            if contenido.strip().startswith(b"<!DOCTYPE html>"):
-                st.warning(f"⚠️ Google Drive devolvió una página HTML para {os.path.basename(destino)}. Verifica el enlace o permisos.")
-                return False
-            with open(destino, "wb") as f:
-                f.write(contenido)
-            # Validar que el archivo tenga estructura de ZIP (xlsx)
-            with open(destino, "rb") as f:
-                cabecera = f.read(4)
-                if cabecera != b'PK\x03\x04':
-                    st.error(f"❌ Archivo corrupto o no válido: {os.path.basename(destino)}")
-                    os.remove(destino)
-                    return False
-            return True
-        else:
-            st.warning(f"No se pudo descargar (código {r.status_code}): {url}")
-            return False
-    except Exception as e:
-        st.error(f"Error descargando {url}: {e}")
-        return False
-        # =========================
-# Función para descargar archivos desde Google Drive
 # =========================
-import requests
-import os
-import streamlit as st
-
-def descargar_drive(url, destino):
-    """Descarga un archivo desde un enlace directo de Google Drive."""
-    try:
-        r = requests.get(url, allow_redirects=True)
-        if r.status_code == 200:
-            with open(destino, "wb") as f:
-                f.write(r.content)
-            return True
-        else:
-            st.warning(f"No se pudo descargar: {url}")
-            return False
-    except Exception as e:
-        st.error(f"Error descargando {url}: {e}")
-        return False
+# Variables de sesión
+# =========================
+for key in ["data_excel","data_historico","data_consolidar","data_plantilla","data_varios","resultados","resultados_mass","indice_nomina"]:
+    if key not in st.session_state:
+        st.session_state[key] = None if key != "indice_nomina" else 0
 
 # =========================
-# URLs directas de Google Drive
+# Rutas de archivos locales
 # =========================
-urls_drive = {
-    "control_nomina.xlsx": "https://drive.google.com/uc?export=download&id=17O33v9JmMsItavMNm7qw4MX2Zx_K7a2f",
-    "Historico.xlsx":       "https://drive.google.com/uc?export=download&id=10KPDPXUKVF4ogCKzTugI7IbQ0HDzxS3Z",
-    "CONSOLIDAR.xlsx":      "https://drive.google.com/uc?export=download&id=1jzTeF5Trhi2-zAZgzzLPZEEcBDOMyDJT",
-    "PLANTILLA.xlsx":       "https://drive.google.com/uc?export=download&id=1veDSctRyAc1LewNvkamqOfRUnW5tWXQN",
-    "VARIOS.xlsx":          "https://drive.google.com/uc?export=download&id=15oo1JnSuNaT9QUGplu7X8qAwHpbQ8RFa"
-}
+archivo_excel = os.path.join(carpeta, "control_nomina.xlsx")
+archivo_historico = os.path.join(carpeta, "Historico.xlsx")
+archivo_consolidar = os.path.join(carpeta, "CONSOLIDAR.xlsx")
+archivo_plantilla = os.path.join(carpeta, "PLANTILLA.xlsx")
+archivo_varios = os.path.join(carpeta, "VARIOS.xlsx")
 
 # =========================
-# Carpeta local temporal
-# =========================
-carpeta = r"C:\Users\USER-PC0045\Pictures\PAGINA EVENTUAL"
-os.makedirs(carpeta, exist_ok=True)
-
-# =========================
-# Descargar archivos si no existen
-# =========================
-for nombre, url in urls_drive.items():
-    destino = os.path.join(carpeta, nombre)
-    if not os.path.exists(destino):
-        st.info(f"Descargando {nombre} desde Google Drive...")
-        descargar_drive(url, destino)
-
-# =========================
-# Funciones de carga
+# Función de carga con prevención de BadZipFile
 # =========================
 @st.cache_data
 def cargar_datos(ruta):
-    if not os.path.exists(ruta):
+    if not os.path.exists(ruta) or os.path.getsize(ruta) < 1024:
+        st.warning(f"El archivo {ruta} no existe o está corrupto")
         return {}
-    xls = pd.ExcelFile(ruta, engine="openpyxl")
-    data = {}
-    for hoja in xls.sheet_names:
-        data[hoja] = pd.read_excel(xls, sheet_name=hoja, engine="openpyxl")
-    return data
+    try:
+        xls = pd.ExcelFile(ruta, engine="openpyxl")
+        data = {hoja: pd.read_excel(xls, sheet_name=hoja, engine="openpyxl") for hoja in xls.sheet_names}
+        return data
+    except Exception as e:
+        st.error(f"Error cargando {ruta}: {e}")
+        return {}
 
 # =========================
-# Cargar archivos automáticamente
+# Cargar archivos automáticamente al iniciar
 # =========================
-rutas = {
-    "data_excel": os.path.join(carpeta, "control_nomina.xlsx"),
-    "data_historico": os.path.join(carpeta, "Historico.xlsx"),
-    "data_consolidar": os.path.join(carpeta, "CONSOLIDAR.xlsx"),
-    "data_plantilla": os.path.join(carpeta, "PLANTILLA.xlsx"),
-    "data_varios": os.path.join(carpeta, "VARIOS.xlsx")
-}
-
-for key, ruta in rutas.items():
+for key, ruta in [("data_excel", archivo_excel), 
+                  ("data_historico", archivo_historico), 
+                  ("data_consolidar", archivo_consolidar), 
+                  ("data_plantilla", archivo_plantilla),
+                  ("data_varios", archivo_varios)]:
     if key not in st.session_state or st.session_state[key] is None:
         st.session_state[key] = cargar_datos(ruta)
 
@@ -489,6 +490,7 @@ La información no podrá ser difundida o compartida sin autorización del titul
 © Derechos Reservados. Angel Caracas.  
     </div>
 """, unsafe_allow_html=True)
+
 
 
 
