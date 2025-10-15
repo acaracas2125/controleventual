@@ -92,23 +92,47 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# =========================
-# Descarga automática desde Google Drive
-# =========================
 def descargar_drive(url, destino):
-    """Descarga un archivo desde un enlace directo de Google Drive."""
+    """Descarga un archivo de Google Drive y valida que sea Excel válido."""
     try:
-        r = requests.get(url, allow_redirects=True)
+        r = requests.get(url, allow_redirects=True, stream=True)
         if r.status_code == 200:
+            contenido = r.content
+            # Validar que no sea una página HTML (Drive devolviendo error)
+            if contenido.strip().startswith(b"<!DOCTYPE html>"):
+                st.warning(f"⚠️ Google Drive devolvió una página HTML para {os.path.basename(destino)}. Verifica el enlace o permisos.")
+                return False
             with open(destino, "wb") as f:
-                f.write(r.content)
+                f.write(contenido)
+            # Validar que el archivo tenga estructura de ZIP (xlsx)
+            with open(destino, "rb") as f:
+                cabecera = f.read(4)
+                if cabecera != b'PK\x03\x04':
+                    st.error(f"❌ Archivo corrupto o no válido: {os.path.basename(destino)}")
+                    os.remove(destino)
+                    return False
             return True
         else:
-            st.warning(f"No se pudo descargar: {url}")
+            st.warning(f"No se pudo descargar (código {r.status_code}): {url}")
             return False
     except Exception as e:
         st.error(f"Error descargando {url}: {e}")
         return False
+
+# =========================
+# Descarga de archivos si no existen
+# =========================
+carpeta = r"C:\Users\USER-PC0045\Pictures\PAGINA EVENTUAL"
+os.makedirs(carpeta, exist_ok=True)
+
+for nombre, url in urls_drive.items():
+    destino = os.path.join(carpeta, nombre)
+    if not os.path.exists(destino):
+        st.info(f"Descargando {nombre} desde Google Drive...")
+        exito = descargar_drive(url, destino)
+        if not exito:
+            st.error(f"No se pudo descargar correctamente {nombre}. Verifica el enlace.")
+
 
 # =========================
 # URLs de los archivos
@@ -456,3 +480,4 @@ La información no podrá ser difundida o compartida sin autorización del titul
 © Derechos Reservados. Angel Caracas.  
     </div>
 """, unsafe_allow_html=True)
+
