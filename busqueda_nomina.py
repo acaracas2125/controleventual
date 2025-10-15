@@ -135,7 +135,7 @@ for nombre, url in urls_drive.items():
 
 
 # =========================
-# URLs de los archivos
+# URLs directas de Google Drive
 # =========================
 urls_drive = {
     "control_nomina.xlsx": "https://drive.google.com/uc?export=download&id=17O33v9JmMsItavMNm7qw4MX2Zx_K7a2f",
@@ -155,7 +155,10 @@ for nombre, url in urls_drive.items():
     destino = os.path.join(carpeta, nombre)
     if not os.path.exists(destino):
         st.info(f"Descargando {nombre} desde Google Drive...")
-        descargar_drive(url, destino)
+        exito = descargar_drive(url, destino)
+        if not exito:
+            st.error(f"No se pudo descargar correctamente {nombre}. Verifica el enlace.")
+
 
 # =========================
 # Funciones de carga
@@ -480,4 +483,5 @@ La información no podrá ser difundida o compartida sin autorización del titul
 © Derechos Reservados. Angel Caracas.  
     </div>
 """, unsafe_allow_html=True)
+
 
