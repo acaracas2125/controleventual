@@ -118,21 +118,27 @@ def descargar_drive(url, destino):
     except Exception as e:
         st.error(f"Error descargando {url}: {e}")
         return False
-
+        # =========================
+# Función para descargar archivos desde Google Drive
 # =========================
-# Descarga de archivos si no existen
-# =========================
-carpeta = r"C:\Users\USER-PC0045\Pictures\PAGINA EVENTUAL"
-os.makedirs(carpeta, exist_ok=True)
+import requests
+import os
+import streamlit as st
 
-for nombre, url in urls_drive.items():
-    destino = os.path.join(carpeta, nombre)
-    if not os.path.exists(destino):
-        st.info(f"Descargando {nombre} desde Google Drive...")
-        exito = descargar_drive(url, destino)
-        if not exito:
-            st.error(f"No se pudo descargar correctamente {nombre}. Verifica el enlace.")
-
+def descargar_drive(url, destino):
+    """Descarga un archivo desde un enlace directo de Google Drive."""
+    try:
+        r = requests.get(url, allow_redirects=True)
+        if r.status_code == 200:
+            with open(destino, "wb") as f:
+                f.write(r.content)
+            return True
+        else:
+            st.warning(f"No se pudo descargar: {url}")
+            return False
+    except Exception as e:
+        st.error(f"Error descargando {url}: {e}")
+        return False
 
 # =========================
 # URLs directas de Google Drive
@@ -146,19 +152,19 @@ urls_drive = {
 }
 
 # =========================
-# Descarga de archivos si no existen
+# Carpeta local temporal
 # =========================
 carpeta = r"C:\Users\USER-PC0045\Pictures\PAGINA EVENTUAL"
 os.makedirs(carpeta, exist_ok=True)
 
+# =========================
+# Descargar archivos si no existen
+# =========================
 for nombre, url in urls_drive.items():
     destino = os.path.join(carpeta, nombre)
     if not os.path.exists(destino):
         st.info(f"Descargando {nombre} desde Google Drive...")
-        exito = descargar_drive(url, destino)
-        if not exito:
-            st.error(f"No se pudo descargar correctamente {nombre}. Verifica el enlace.")
-
+        descargar_drive(url, destino)
 
 # =========================
 # Funciones de carga
@@ -483,5 +489,6 @@ La información no podrá ser difundida o compartida sin autorización del titul
 © Derechos Reservados. Angel Caracas.  
     </div>
 """, unsafe_allow_html=True)
+
 
 
